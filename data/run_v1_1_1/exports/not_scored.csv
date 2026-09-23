@@ -1,0 +1,71 @@
+acronym,name,web_status,catalog_status,catalog_error,download_status,download_http_status,download_error,eval_status,eval_error_type,eval_error,eval_stage_at_failure,eval_attempts,eval_bytes,bp_classes,bp_language
+ADMF,alzhaimer dessiese main factors,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+BCMO,Breast Cancer-Microbiome Ontology ,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+BLLM,Large Language Model Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+BMS-LM,BioMedical Study Lifecycle Management,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,unsupported_format:empty,parse,1.0,0.0,154.0,OWL
+BOSHI,boshra,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+BPFORMS,"Ontology of chemically concrete, composable DNA, RNA, and protein residue and crosslinks",parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,unsupported_format:obo,parse,1.0,1603954.0,0.0,OBO
+C19M,COVID-19,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+CATALOG-THEMES,Catalog Themes,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"unsupported format (tried turtle, auto, xml, n3, nt, trig, trix). Last error: file:///C:/owl4_run/downloads/CATALOG-THEMES/3/CATALOG-THEMES_3_original-submission.ttl:1:0: not well-formed (invalid token)",parse,1.0,1207.0,0.0,SKOS
+CCO,Cell Cycle Ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,unsupported_format:obo,parse,1.0,256083060.0,264891.0,OBO
+CEDARPC,CEDAR Provisional Classes,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+CHEMBIO,Systems Chemical Biology and Chemogenomics Ontology ,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+CO,Crop Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+CPT,CPT - Current Procedural Terminology,not_downloadable,ok,,summary_only,,,,,,,,,14403.0,UMLS
+CS,Coping Strategies for Adverse Drug Events Ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"unsupported format (tried owlready2:owlxml). Last error: OWL/XML parsing error in file C:\owl4_run\downloads\CS\1\CS_1_original.owl, line 15, column 76.",parse,1.0,11978763.0,0.0,OWL
+DRMO,Dental Restorative Material Ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"unsupported format (tried turtle, auto, xml, n3, nt, trig, trix). Last error: file:///C:/owl4_run/downloads/DRMO/1/DRMO_1_original-submission.rdf:1:0: not well-formed (invalid token)",parse,1.0,295118.0,253.0,OWL
+DSAV,Digital Specimen Accessibility Vocabulary,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+DSIP,Pharmacy mock data,empty,ok,,ok,200.0,,done,,,,1.0,219.0,0.0,SKOS
+FARMACI,FARMACI AIFA,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+FITBIT,Fitbit Vocabulary,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+FLUXO,Metabolic Flux Analysis Ontology,failed,ok,,html_response,200.0,server returned HTML,,,,,,,,OWL
+GENEVIEVE,Charlotte,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+HC,Habronattus Courtship Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+HCMO,Home Cage Monitoring Ontology,failed,ok,,html_response,200.0,server returned HTML,,,,,,,,OWL
+HERO,Healthcare Monitoring and Emergency Response Ontology,not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for HERO""],""status"":403}",,,,,,,1205.0,OWL
+HIV,HIV ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,unsupported_format:obo,parse,1.0,2411067.0,0.0,OBO
+HIVHPV,HIVHPV,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+HIVHPVSTOM,HIVHPVStom,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+HMADO,Human Microbiome Associated Disease Ontology ,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+HMIS033B,HMIS 033,empty,ok,,ok,200.0,,done,,,,1.0,15811.0,0.0,SKOS
+HSCLO38,Homo sapiens Chromosomal Location Ontology for GRCh38,failed,ok,,not_found,404.0,"{""errors"":[""No source file is available for this submission""],""status"":404}",,,,,,,,OWL
+ICD10,"International Classification of Diseases, Version 10",not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for ICD10""],""status"":403}",,,,,,,12445.0,UMLS
+ICNP,International Classification for Nursing Practice,not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for ICNP""],""status"":403}",,,,,,,4476.0,OWL
+ICPC2P,International Classification of Primary Care - 2 PLUS,not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for ICPC2P""],""status"":403}",,,,,,,7537.0,UMLS
+INFRA-EN,Infrastructure,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+IVAN,IVAN OTERO,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+JSO,JS Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+KUSIIMA,naava,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+LIB,MWS-WSM,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+LIBRARY,wsm24,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+LSFC,LSFC,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+M,May,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+MDDB,Master Drug Data Base Clinical Drugs,not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for MDDB""],""status"":403}",,,,,,,13817.0,UMLS
+METAMESH,Meta Mesh Ontology,not_downloadable,ok,,summary_only,,,,,,,,,79.0,OWL
+MIRNAO,MicroRNA Ontology,not_downloadable,ok,,summary_only,,,,,,,,,676.0,OWL
+MM,mm,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+NCOD,NCoD,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"unsupported format (tried turtle, auto, xml, n3, nt, trig, trix). Last error: file:///C:/owl4_run/downloads/NCOD/1/NCOD_1_original-submission.ttl:1:0: not well-formed (invalid token)",parse,1.0,921080.0,0.0,SKOS
+NDDF,National Drug Data File,not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for NDDF""],""status"":403}",,,,,,,33583.0,UMLS
+NDFRT,National Drug File - Reference Terminology,not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for NDFRT""],""status"":403}",,,,,,,36202.0,UMLS
+NHSQI2009,NHS Quality Indicators,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+NIC,Nursing Interventions Classification,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+OCDM,Ontology of Craniofacial Development and Malformation,empty,ok,,ok,200.0,,done,,,,1.0,1647.0,0.0,OWL
+ODENTIFYHUMAN,Ontology for Forensic Human Identification by Dental Evidence and Source Conclusions,not_downloadable,ok,,summary_only,,,,,,,,,,OWL
+OPD-NAMBOBI,SELECTED OTHER PRIORITY DISEASES UNDER IDSR (INTEGRATED DISEASE SURVEILLANCE AND RESPONSES),empty,ok,,ok,200.0,,done,,,,1.0,9125.0,0.0,SKOS
+OPDRE,OPD Regitry Ethiopia,empty,ok,,ok,200.0,,done,,,,1.0,15321.0,0.0,SKOS
+OTO, Obesity Tracking Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+PEO_ONTOLOGY,Prompt Engineering Ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"unsupported format (tried xml, auto, turtle, n3, nt, trig, trix, owlready2:rdfxml). Last error: RDF/XML parsing error in file C:\owl4_run\downloads\PEO_ONTOLOGY\3\PEO_ONTOLOGY_3_original-submission.rdf, line 1241, column 135.",parse,1.0,335597.0,124.0,OWL
+PHARMGKB,PharmGKB Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+PHENOMEBLAST,PhenomeBLAST Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+PPLC,Placental Pathology Lesion Classification,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"unsupported format (tried owlready2:owlxml). Last error: OWL/XML parsing error in file C:\owl4_run\downloads\PPLC\1\PPLC_1_original.owl, line 7, column 56.",parse,1.0,1425582.0,156.0,OWL
+RADMO,RADx Metadata Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+RCD,"Read Codes, Clinical Terms Version 3 (CTV3) ",not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for RCD""],""status"":403}",,,,,,,140065.0,UMLS
+RGD,RRB Group D,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+SALMO,Salmonella Serotype vocabulary,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+SIMON,Simple Measurement Ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"unsupported format (tried xml, auto, turtle, n3, nt, trig, trix, owlready2:rdfxml). Last error: RDF/XML parsing error in file C:\owl4_run\downloads\SIMON\1\SIMON_1_original-submission.owl, line 33, column 210.",parse,1.0,693186.0,41.0,OWL
+SNOMEDCT,"SNOMED CT, US Edition",not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for SNOMEDCT""],""status"":403}",,,,,,,382297.0,UMLS
+TESTONTOLO,Test_data,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+VODANETHIOPIA_OR,ETHIOPIA_OUTPATIENT,not_an_ontology,ok,,ok,200.0,,parse_failed,OntologyParseError,not_an_ontology:office_document,parse,1.0,17813.0,,SKOS
+WHO-ART,World Health Organization (WHO) Adverse Reaction Terminology,not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for WHO-ART""],""status"":403}",,,,,,,1851.0,UMLS
+WSM-LIBRARY,MWS,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+YUNPING,yunping,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"unsupported format (tried xml, auto, turtle, n3, nt, trig, trix, owlready2:rdfxml). Last error: RDF/XML parsing error in file C:\owl4_run\downloads\YUNPING\1\extracted\https%3A%2F%2Fvodan-totafrica.info%2FANC.rdf, line 27, column 68.",parse,1.0,198703.0,2.0,OWL

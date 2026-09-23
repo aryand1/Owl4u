@@ -1,0 +1,161 @@
+{
+  "time": "2026-09-23T23:25:10+00:00",
+  "run_id": "20260923-175343-0ecbf1",
+  "notebook_version": "owl4-batch-1.1.1",
+  "work_dir": "C:\\owl4_run",
+  "ontologies_in_catalog": 1289,
+  "web_status_counts": {
+    "scored": 1219,
+    "no_submission": 27,
+    "not_downloadable": 22,
+    "parse_failed": 12,
+    "empty": 5,
+    "failed": 3,
+    "not_an_ontology": 1
+  },
+  "status": {
+    "catalog": {
+      "no_submission": 27,
+      "ok": 1262
+    },
+    "downloads": {
+      "html_response": 2,
+      "not_downloadable": 10,
+      "not_found": 1,
+      "ok": 1237,
+      "summary_only": 12
+    },
+    "evaluations": {
+      "done": 1224,
+      "parse_failed": 13
+    },
+    "evaluation_hours_done": 4.04
+  },
+  "score_stats": {
+    "describe_score": {
+      "n": 1219,
+      "mean": 9.124356029532404,
+      "std": 2.2092717536062305,
+      "min": 0.0,
+      "p05": 3.5930000000000004,
+      "p25": 9.66,
+      "median": 9.98,
+      "p75": 10.0,
+      "p95": 10.0,
+      "max": 10.0
+    },
+    "define_score": {
+      "n": 1219,
+      "mean": 2.8754963084495486,
+      "std": 2.5805207668222976,
+      "min": 0.0,
+      "p05": 0.0,
+      "p25": 0.055,
+      "median": 2.56,
+      "p75": 5.52,
+      "p95": 6.63,
+      "max": 7.82
+    },
+    "define_bp_score": {
+      "n": 1219,
+      "mean": 2.952346185397867,
+      "std": 2.5798725397780866,
+      "min": 0.0,
+      "p05": 0.0,
+      "p25": 0.08,
+      "median": 2.81,
+      "p75": 5.58,
+      "p95": 6.64,
+      "max": 7.82
+    },
+    "connection_score": {
+      "n": 1219,
+      "mean": 3.1739622641509433,
+      "std": 3.09991877983312,
+      "min": 0.0,
+      "p05": 0.0,
+      "p25": 0.0,
+      "median": 2.39,
+      "p75": 6.095,
+      "p95": 8.32,
+      "max": 9.71
+    },
+    "flat_score": {
+      "n": 1219,
+      "mean": 8.063986874487284,
+      "std": 3.3601204400205353,
+      "min": 0.0,
+      "p05": 0.0,
+      "p25": 8.0,
+      "median": 10.0,
+      "p75": 10.0,
+      "p95": 10.0,
+      "max": 10.0
+    },
+    "core_average": {
+      "n": 1219,
+      "mean": 5.809450369155044,
+      "std": 1.7745295900588787,
+      "min": 0.0,
+      "p05": 2.5,
+      "p25": 4.76375,
+      "median": 6.045,
+      "p75": 7.05875,
+      "p95": 8.466499999999998,
+      "max": 9.13
+    },
+    "core_average_bp": {
+      "n": 1219,
+      "mean": 5.828662838392124,
+      "std": 1.7786857267724214,
+      "min": 0.0,
+      "p05": 2.5,
+      "p25": 4.76375,
+      "median": 6.0675,
+      "p75": 7.0875,
+      "p95": 8.48025,
+      "max": 9.13
+    }
+  },
+  "config": {
+    "work_dir": "C:\\owl4_run",
+    "provider": "bioportal",
+    "bioportal_api": "https://data.bioontology.org",
+    "bioportal_ui": "https://bioportal.bioontology.org/ontologies",
+    "requests_per_second": 5.0,
+    "http_timeout_s": 60,
+    "download_read_timeout_s": 600,
+    "max_http_retries": 5,
+    "include_views": false,
+    "download_format": "rdf",
+    "download_fallback_original": true,
+    "max_download_gb": null,
+    "keep_downloads": true,
+    "download_stream_retries": 3,
+    "obo_owl_fallback": true,
+    "use_owlready2": true,
+    "python_hash_seed": 0,
+    "device": "auto",
+    "bert_name": "bert-base-uncased",
+    "bert_max_length": 128,
+    "batch_size_gpu": 128,
+    "batch_size_cpu": 32,
+    "mixed_precision": false,
+    "cpu_threads": 0,
+    "define_vectors_on_gpu_max_gb": 4.0,
+    "define_cpu_fallback": true,
+    "define_min_tokens": 12,
+    "depth_target": 5,
+    "branch_target": 3,
+    "suggestion_threshold": 4.0,
+    "eval_timeout_min": 120,
+    "worker_ram_limit_gb": null,
+    "max_attempts": 2,
+    "worker_ready_timeout_s": 1800,
+    "heartbeat_s": 60,
+    "save_entity_tables": true,
+    "entity_rows_max": null,
+    "keep_awake": true
+  },
+  "evaluation_seconds_total": 14533.045
+}

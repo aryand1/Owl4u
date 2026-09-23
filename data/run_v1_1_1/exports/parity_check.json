@@ -1,0 +1,53 @@
+{
+  "time": "2026-09-23T22:53:47+00:00",
+  "cases": [
+    {
+      "name": "tiny",
+      "ok": true,
+      "got": {
+        "describe_score": 9.29,
+        "define_score": 4.81,
+        "connection_score": 1.65,
+        "flat_score": 6
+      },
+      "expected": {
+        "describe_score": 9.29,
+        "define_score": 4.81,
+        "connection_score": 1.65,
+        "flat_score": 6
+      },
+      "seconds": 0.531
+    },
+    {
+      "name": "goodrelations",
+      "ok": true,
+      "got": {
+        "describe_score": 9.29,
+        "define_score": 6.09,
+        "connection_score": 3.87,
+        "flat_score": 8
+      },
+      "expected": {
+        "describe_score": 9.29,
+        "define_score": 6.09,
+        "connection_score": 3.87,
+        "flat_score": 8
+      },
+      "seconds": 0.39
+    }
+  ],
+  "worker": {
+    "type": "ready",
+    "pid": 39740,
+    "device": "cuda",
+    "batch_size": 128,
+    "model_load_seconds": 5.69,
+    "torch": "2.12.0.dev20260330+cu128",
+    "cuda_available": true,
+    "gpu_name": "NVIDIA GeForce RTX 5090",
+    "python": "3.11.15",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "python_hash_seed": "0"
+  },
+  "all_ok": true
+}
