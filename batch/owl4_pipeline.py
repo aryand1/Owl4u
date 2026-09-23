@@ -33,7 +33,7 @@ import requests
 
 import owl4_core as core
 
-NOTEBOOK_VERSION = "owl4-batch-1.0"
+NOTEBOOK_VERSION = "owl4-batch-1.1.1"
 
 DEFAULT_CONFIG: dict = {
     # where everything goes
@@ -51,6 +51,10 @@ DEFAULT_CONFIG: dict = {
     "download_fallback_original": True,
     "max_download_gb": None,
     "keep_downloads": True,
+    "download_stream_retries": 3,
+    "obo_owl_fallback": True,
+    "use_owlready2": True,
+    "python_hash_seed": 0,
     # model and device
     "device": "auto",
     "bert_name": "bert-base-uncased",
@@ -527,8 +531,12 @@ def _prepare_eval_file(raw_path: Path, master_name: str | None) -> dict:
         target.mkdir(exist_ok=True)
         with zipfile.ZipFile(raw_path) as zf:
             members = [m for m in zf.infolist() if not m.is_dir()]
+            names = [m.filename for m in members]
+            if "[Content_Types].xml" in names:
+                out.update(archive_type="office_document", archive_members=json.dumps(names[:500]),
+                           sniffed_format="office_document")
+                return out
             zf.extractall(target)
-        names = [m.filename for m in members]
         pick = None
         if master_name:
             pick = next((m for m in members if Path(m.filename).name == master_name), None)
@@ -546,6 +554,93 @@ def _prepare_eval_file(raw_path: Path, master_name: str | None) -> dict:
         out.update(eval_path=str(eval_path), archive_type="gzip",
                    sniffed_format=core.sniff_format(str(eval_path)))
     return out
+
+
+def _fetch(ctx: Ctx, acr: str, sub: int, variant: str, url: str, params: dict, dest_dir: Path,
+           master_name: str | None, *, external: bool = False) -> dict:
+    """Download one candidate file, retrying broken streams.
+
+    ``url`` is a BioPortal API path, or a full URL when ``external`` is True.
+    External URLs are fetched without the BioPortal API key.
+    Returns {"outcome": ok|forbidden|too_large|http_error|html|stream_error, "result": row, "entry": log}.
+    """
+    max_bytes = int(ctx.cfg["max_download_gb"] * 2**30) if ctx.cfg["max_download_gb"] else None
+    retries = max(1, int(ctx.cfg.get("download_stream_retries", 3)))
+    read_timeout = ctx.cfg["download_read_timeout_s"]
+    shown_url = url if external else f"{ctx.cfg['bioportal_api'].rstrip('/')}{url}"
+    entry: dict = {"variant": variant, "url": shown_url, "params": params, "tries": []}
+    last_error = None
+    for attempt in range(1, retries + 1):
+        if external:
+            try:
+                resp = requests.get(url, params=params, stream=True, timeout=(30, read_timeout),
+                                    headers={"User-Agent": f"{NOTEBOOK_VERSION} (WiseOwl batch evaluation)"})
+                info = {"status": resp.status_code}
+            except requests.RequestException as exc:
+                resp, info = None, {"error": f"{type(exc).__name__}: {str(exc)[:200]}"}
+        else:
+            resp, info = ctx.api.request(url, params, stream=True, read_timeout=read_timeout)
+        status_code = info.get("status")
+        if resp is None or resp.status_code != 200:
+            body = None
+            if resp is not None:
+                try:
+                    body = resp.text[:500]
+                finally:
+                    resp.close()
+            entry["tries"].append({"status": status_code, "error": info.get("error"), "body": body})
+            entry.update(status=status_code, body=body)
+            if status_code in (401, 403):
+                return {"outcome": "forbidden", "entry": entry,
+                        "result": {"status": "not_downloadable", "http_status": status_code, "error": body}}
+            if resp is not None:
+                return {"outcome": "http_error", "entry": entry,
+                        "result": {"status": "not_found" if status_code == 404 else "failed",
+                                   "http_status": status_code, "error": body}}
+            last_error = info.get("error")
+            time.sleep(5 * attempt)
+            continue
+        ctype = resp.headers.get("Content-Type")
+        clen = resp.headers.get("Content-Length")
+        if max_bytes and clen and int(clen) > max_bytes:
+            resp.close()
+            entry["skipped"] = f"content-length {clen} over limit"
+            return {"outcome": "too_large", "entry": entry,
+                    "result": {"status": "skipped_too_large", "http_status": 200, "bytes": int(clen)}}
+        server_name = _server_filename(resp)
+        if not server_name and external:
+            server_name = Path(requests.utils.urlparse(resp.url).path).name or None
+        ext = Path(server_name).suffix if server_name else ".download"
+        tag = safe_name(variant.replace(":", "-"))
+        raw_path = dest_dir / f"{safe_name(acr)}_{sub}_{tag}{ext or '.download'}"
+        try:
+            sha, size = _stream_to_file(resp, raw_path, max_bytes)
+        except Exception as exc:  # noqa: BLE001
+            last_error = f"stream failed: {type(exc).__name__}: {str(exc)[:300]}"
+            entry["tries"].append({"status": 200, "error": last_error})
+            if attempt < retries:
+                time.sleep(10 * attempt)
+                continue
+            return {"outcome": "stream_error", "entry": entry,
+                    "result": {"status": "failed", "http_status": 200, "error": last_error}}
+        finally:
+            resp.close()
+        if sha is None:
+            entry["skipped"] = f"stream exceeded limit at {size} bytes"
+            return {"outcome": "too_large", "entry": entry,
+                    "result": {"status": "skipped_too_large", "http_status": 200, "bytes": size}}
+        prep = _prepare_eval_file(raw_path, master_name)
+        entry.update(status=200, bytes=size, sniffed=prep["sniffed_format"], tries_used=attempt)
+        if prep["sniffed_format"] == "html":
+            return {"outcome": "html", "entry": entry,
+                    "result": {"status": "html_response", "http_status": 200, "error": "server returned HTML"}}
+        return {"outcome": "ok", "entry": entry,
+                "result": {"status": "ok", "variant": variant, "http_status": 200, "url": shown_url,
+                           "raw_path": str(raw_path), "bytes": size, "sha256": sha, "content_type": ctype,
+                           "server_filename": server_name, **prep,
+                           "eval_bytes": Path(prep["eval_path"]).stat().st_size}}
+    return {"outcome": "network_error", "entry": entry,
+            "result": {"status": "failed", "error": last_error}}
 
 
 def download_phase(ctx: Ctx, only: list | None = None, retry_failed: bool = False,
@@ -603,62 +698,13 @@ def download_phase(ctx: Ctx, only: list | None = None, retry_failed: bool = Fals
             result = None
             t0 = time.perf_counter()
             for variant, path, params in variants:
-                try:
-                    resp, info = api.request(path, params, stream=True,
-                                             read_timeout=ctx.cfg["download_read_timeout_s"])
-                except AuthError:
-                    raise
-                entry = {"variant": variant, "url": f"{api.base}{path}", "params": params,
-                         "status": info.get("status"), "error": info.get("error")}
-                if resp is None or resp.status_code != 200:
-                    if resp is not None:
-                        entry["body"] = resp.text[:500]
-                        resp.close()
-                    attempts_log.append(entry)
-                    if resp is not None and resp.status_code in (401, 403):
-                        result = {"status": "not_downloadable", "http_status": resp.status_code,
-                                  "error": entry.get("body")}
-                        break
-                    continue
-                ctype = resp.headers.get("Content-Type")
-                clen = resp.headers.get("Content-Length")
-                if max_bytes and clen and int(clen) > max_bytes:
-                    resp.close()
-                    entry["skipped"] = f"content-length {clen} over limit"
-                    attempts_log.append(entry)
-                    result = {"status": "skipped_too_large", "http_status": 200, "bytes": int(clen)}
+                out = _fetch(ctx, acr, sub, variant, path, params, dest_dir, row.get("bp_master_file_name"))
+                attempts_log.append(out["entry"])
+                result = out["result"]
+                if out["outcome"] in ("ok", "forbidden", "too_large"):
                     break
-                server_name = _server_filename(resp)
-                ext = Path(server_name).suffix if server_name else ".download"
-                raw_path = dest_dir / f"{safe_name(acr)}_{sub}_{variant.split(':')[0]}{ext or '.download'}"
-                try:
-                    sha, size = _stream_to_file(resp, raw_path, max_bytes)
-                except Exception as exc:  # noqa: BLE001
-                    entry["error"] = f"stream failed: {type(exc).__name__}: {exc}"
-                    attempts_log.append(entry)
-                    continue
-                finally:
-                    resp.close()
-                if sha is None:
-                    entry["skipped"] = f"stream exceeded limit at {size} bytes"
-                    attempts_log.append(entry)
-                    result = {"status": "skipped_too_large", "http_status": 200, "bytes": size}
-                    break
-                prep = _prepare_eval_file(raw_path, row.get("bp_master_file_name"))
-                entry.update(bytes=size, sniffed=prep["sniffed_format"])
-                attempts_log.append(entry)
-                if prep["sniffed_format"] == "html":
-                    result = {"status": "html_response", "http_status": 200, "error": "server returned HTML"}
-                    continue
-                result = {"status": "ok", "variant": variant, "http_status": 200, "url": entry["url"],
-                          "raw_path": str(raw_path), "bytes": size, "sha256": sha, "content_type": ctype,
-                          "server_filename": server_name, **prep,
-                          "eval_bytes": Path(prep["eval_path"]).stat().st_size}
-                break
             if result is None:
-                last = attempts_log[-1] if attempts_log else {}
-                result = {"status": "not_found" if last.get("status") == 404 else "failed",
-                          "http_status": last.get("status"), "error": last.get("body") or last.get("error")}
+                result = {"status": "failed", "error": "no download variants configured"}
             ctx.state.upsert("downloads", {**base, **result, "finished_at": now(),
                                            "seconds": round(time.perf_counter() - t0, 3),
                                            "attempts_log": json.dumps(attempts_log)},
@@ -728,7 +774,7 @@ class EvalWorker:
             "device", "bert_name", "bert_max_length", "batch_size_gpu", "batch_size_cpu",
             "mixed_precision", "cpu_threads", "define_vectors_on_gpu_max_gb", "define_cpu_fallback",
             "define_min_tokens", "depth_target", "branch_target", "suggestion_threshold",
-            "save_entity_tables", "entity_rows_max")}
+            "save_entity_tables", "entity_rows_max", "use_owlready2")}
         self.wcfg.update(log_dir=str(ctx.paths["logs"]), stage_file=str(self.stage_file))
 
     def alive(self) -> bool:
@@ -740,6 +786,10 @@ class EvalWorker:
         code_dir = str(Path(core.__file__).resolve().parent)
         if code_dir not in sys.path:
             sys.path.insert(0, code_dir)
+        # A fixed hash seed makes set order, and so WiseOwl's Flat on ontologies with
+        # subclass cycles, the same on every run. The worker is a new Python process,
+        # so it picks this up at start-up.
+        os.environ["PYTHONHASHSEED"] = str(self.ctx.cfg.get("python_hash_seed", 0))
         mpc = mp.get_context("spawn")
         self.tq, self.rq = mpc.Queue(), mpc.Queue()
         self.proc = mpc.Process(target=owl4_worker.worker_main, args=(self.tq, self.rq, self.wcfg),
@@ -880,6 +930,7 @@ def evaluate_phase(ctx: Ctx, only: list | None = None, limit: int | None = None,
     tmin = timeout_min or ctx.cfg["eval_timeout_min"]
     print(f"Limits per ontology: {tmin:.0f} min, {ram_gb} GB worker RAM. Interrupt the kernel to pause; re-run to resume.")
     worker = EvalWorker(ctx)
+    extra_props = _bp_definition_map(ctx)
     counts: dict = {}
     t_start = time.time()
     done_bytes = 0
@@ -900,7 +951,7 @@ def evaluate_phase(ctx: Ctx, only: list | None = None, limit: int | None = None,
                              ("acronym", "submission_id"))
             out_dir = ctx.paths["results"] / safe_name(acr) / str(sub)
             task = {"key": key, "acronym": acr, "submission_id": sub, "path": r["eval_path"],
-                    "out_dir": str(out_dir)}
+                    "out_dir": str(out_dir), "extra_definition_props": extra_props.get(acr, [])}
             msg = worker.run(task, tmin * 60, ram_limit)
             status = msg.get("status", "error")
             upd = {"acronym": acr, "submission_id": sub, "status": status, "finished_at": now(),
@@ -915,8 +966,12 @@ def evaluate_phase(ctx: Ctx, only: list | None = None, limit: int | None = None,
                            connection_score=s["connection_score"], flat_score=s["flat_score"],
                            core_average=s["core_average"], summary_json=json.dumps(core.to_jsonable(s)),
                            result_path=msg.get("result_path"), entities_path=msg.get("entities_path"))
-            elif status in RETRYABLE_EVAL and attempts >= ctx.cfg["max_attempts"]:
-                upd["status"] = "gave_up"
+            else:
+                # a failed re-run must not leave the previous run's scores behind
+                upd.update(describe_score=None, define_score=None, connection_score=None, flat_score=None,
+                           core_average=None, summary_json=None, result_path=None, entities_path=None)
+                if status in RETRYABLE_EVAL and attempts >= ctx.cfg["max_attempts"]:
+                    upd["status"] = "gave_up"
             ctx.state.upsert("evaluations", upd, ("acronym", "submission_id"))
             if status == "done" and not ctx.cfg.get("keep_downloads", True):
                 shutil.rmtree(ctx.paths["downloads"] / safe_name(acr) / str(sub), ignore_errors=True)
@@ -926,6 +981,10 @@ def evaluate_phase(ctx: Ctx, only: list | None = None, limit: int | None = None,
             if status == "done":
                 line = (f"avg {s['core_average']:.2f} (Describe {s['describe_score']}, Define {s['define_score']}, "
                         f"Connection {s['connection_score']}, Flat {s['flat_score']})")
+                if s.get("define_bp_source") not in (None, "same_as_strict"):
+                    line += f" | Define_bp {s['define_bp_score']}, avg_bp {s['core_average_bp']:.2f}"
+                if s.get("entities") == 0:
+                    line += " | EMPTY (0 entities)"
             else:
                 line = f"{upd['status'].upper()}: {str(upd['error'])[:160]}"
                 ctx.event("evaluate", acr, "WARNING", f"{upd['status']} at stage {upd['stage_at_failure']}: {upd['error']}")
@@ -948,6 +1007,261 @@ def evaluate_phase(ctx: Ctx, only: list | None = None, limit: int | None = None,
     ctx.event("evaluate", None, "INFO", f"evaluate phase finished: {counts}; worker restarts {worker.restarts}")
     ctx.state.exec("UPDATE runs SET finished_at=?, phase=? WHERE run_id=?", (now(), "evaluate", ctx.run_id))
     return counts
+
+
+# =============================================================================
+# Version 1.1: BioPortal-aware Define and repairs for an existing work folder
+# =============================================================================
+
+WISEOWL_DEFINE_IRIS = {str(p) for p in core.DEFINE_DEFINITION_PROPS}
+
+
+def _bp_definition_iris(sub: dict | None) -> list:
+    """Definition property IRIs that BioPortal records for a submission."""
+    if not isinstance(sub, dict):
+        return []
+    value = sub.get("definitionProperty")
+    if not value:
+        return []
+    items = value if isinstance(value, list) else [value]
+    out = []
+    for x in items:
+        if isinstance(x, dict):
+            x = x.get("@id")
+        if isinstance(x, str) and x.startswith("http"):
+            out.append(x)
+    return out
+
+
+def _bp_definition_map(ctx: Ctx) -> dict:
+    out = {}
+    for r in ctx.state.q("SELECT acronym, submission_json FROM catalog"):
+        try:
+            out[r["acronym"]] = _bp_definition_iris(json.loads(r["submission_json"] or "null"))
+        except ValueError:
+            out[r["acronym"]] = []
+    return out
+
+
+def plan_v11(ctx: Ctx) -> dict:
+    """Work out which ontologies the 1.1 update needs to touch. Changes nothing."""
+    cat = {r["acronym"]: r for r in ctx.state.q("SELECT acronym, submission_json, metrics_json FROM catalog")}
+    downloads = {r["acronym"]: r for r in ctx.state.q("SELECT acronym, status, variant FROM downloads")}
+    evals = {r["acronym"]: r for r in ctx.state.q("SELECT acronym, status, summary_json FROM evaluations")}
+    plan: dict = {"download_failed": [], "parse_failed": [], "empty": [], "define_candidates": [],
+                  "define_reasons": {}, "flat_recheck": [], "already_v11": []}
+    for acr, d in downloads.items():
+        if d["status"] in ("failed", "html_response", "not_found"):
+            plan["download_failed"].append(acr)
+    for acr, e in evals.items():
+        if e["status"] == "parse_failed":
+            plan["parse_failed"].append(acr)
+            continue
+        if e["status"] != "done":
+            continue
+        summ = json.loads(e["summary_json"] or "{}")
+        if summ.get("entities") == 0:
+            plan["empty"].append(acr)
+            continue
+        if "define_bp_score" in summ:
+            plan["already_v11"].append(acr)
+            continue
+        if (summ.get("flat_cycle_back_edges") or 0) > 0 and (summ.get("flat_max_depth") or 0) <= 6:
+            plan["flat_recheck"].append(acr)
+        c = cat.get(acr) or {}
+        sub = json.loads(c.get("submission_json") or "null")
+        met = json.loads(c.get("metrics_json") or "null") or {}
+        reasons = []
+        extra = [i for i in _bp_definition_iris(sub) if i not in WISEOWL_DEFINE_IRIS]
+        if extra:
+            reasons.append("BioPortal definition property " + ", ".join(extra))
+        try:
+            bp_defined = int(met.get("classes") or 0) - int(met.get("classesWithNoDefinition") or 0)
+        except (TypeError, ValueError):
+            bp_defined = 0
+        wo_defined = summ.get("define_defined") or 0
+        if bp_defined >= 10 and wo_defined < 0.5 * bp_defined:
+            reasons.append(f"BioPortal counts {bp_defined} definitions, WiseOwl found {wo_defined}")
+        if reasons:
+            plan["define_candidates"].append(acr)
+            plan["define_reasons"][acr] = "; ".join(reasons)
+    for k in ("download_failed", "parse_failed", "empty", "define_candidates", "flat_recheck"):
+        plan[k] = sorted(plan[k])
+    return plan
+
+
+def _alternate_sources(ctx: Ctx, acr: str, sub: int, current_variant: str | None) -> list:
+    """Other places to get the same ontology: BioPortal's original upload, then an OWL file for OBO ontologies."""
+    row = ctx.state.one("SELECT submission_json FROM catalog WHERE acronym=?", (acr,)) or {}
+    subj = json.loads(row.get("submission_json") or "null") or {}
+    alts = []
+    if not (current_variant or "").startswith("original"):
+        alts.append(("original:submission", f"/ontologies/{acr}/submissions/{sub}/download", {}, False))
+    lang = str(subj.get("hasOntologyLanguage") or "").upper()
+    dl = ctx.state.one("SELECT sniffed_format FROM downloads WHERE acronym=? AND submission_id=?", (acr, sub)) or {}
+    if ctx.cfg.get("obo_owl_fallback", True) and (lang == "OBO" or dl.get("sniffed_format") == "obo"):
+        cands = []
+        pull = subj.get("pullLocation")
+        if isinstance(pull, str) and pull.startswith("http"):
+            if pull.lower().endswith(".obo"):
+                cands.append(pull[:-4] + ".owl")
+            elif pull.lower().endswith((".owl", ".rdf", ".ttl", ".owl.gz")):
+                cands.append(pull)
+        cands.append(f"http://purl.obolibrary.org/obo/{acr.lower()}.owl")
+        for i, u in enumerate(dict.fromkeys(cands)):
+            alts.append((f"obo_owl:{i}", u, {}, True))
+    return alts
+
+
+def fetch_from_url(ctx: Ctx, acronym: str, url: str, *, evaluate: bool = True, force: bool = False) -> dict:
+    """Get an ontology file from another address (for example the OBO Foundry) and score it.
+
+    Skipped when the ontology already has a non-empty score, unless force=True.
+    The download_variant column records where the file came from.
+    """
+    d = ctx.state.one("SELECT * FROM downloads WHERE acronym=?", (acronym,))
+    if d is None:
+        print(f"{acronym}: not in the downloads table; run the download phase first.")
+        return {"outcome": "unknown_acronym"}
+    if not force and _is_good(ctx, acronym):
+        print(f"{acronym}: already scored; nothing to do (use force=True to fetch anyway).")
+        return {"outcome": "already_scored"}
+    sub = int(d["submission_id"])
+    dest = ctx.paths["downloads"] / safe_name(acronym) / str(sub)
+    dest.mkdir(parents=True, exist_ok=True)
+    host = requests.utils.urlparse(url).netloc or "url"
+    print(f"{acronym}: downloading {url} ...")
+    out = _fetch(ctx, acronym, sub, f"url:{host}", url, {}, dest, None, external=True)
+    print(f"{acronym}: {out['outcome']}, {out['entry'].get('bytes')} bytes")
+    if out["outcome"] != "ok":
+        return out
+    old_log = json.loads(d.get("attempts_log") or "[]")
+    ctx.state.upsert("downloads", {"acronym": acronym, "submission_id": sub, **out["result"],
+                                   "finished_at": now(), "run_id": ctx.run_id,
+                                   "attempts_log": json.dumps(old_log + [out["entry"]])},
+                     ("acronym", "submission_id"))
+    if evaluate:
+        requeue(ctx, statuses=("parse_failed", "done", "error", "crashed", "gave_up"), acronyms=[acronym])
+        print(evaluate_phase(ctx, only=[acronym]))
+    return out
+
+
+def _eval_row(ctx: Ctx, acr: str) -> dict:
+    return ctx.state.one("SELECT * FROM evaluations WHERE acronym=?", (acr,)) or {}
+
+
+def _is_good(ctx: Ctx, acr: str) -> bool:
+    e = _eval_row(ctx, acr)
+    if e.get("status") != "done":
+        return False
+    return json.loads(e.get("summary_json") or "{}").get("entities", 0) > 0
+
+
+def repair_phase(ctx: Ctx) -> dict:
+    """Retry failed downloads, re-parse failures with the 1.1 parser, then try alternate sources."""
+    plan = plan_v11(ctx)
+    report: dict = {"retried_downloads": {}, "reparsed": {}, "alternates": {}}
+
+    # 1. failed downloads (PR and similar)
+    if plan["download_failed"]:
+        print(f"== Retrying {len(plan['download_failed'])} failed downloads: {plan['download_failed']}")
+        report["retried_downloads"] = download_phase(ctx, only=plan["download_failed"], retry_failed=True)
+
+    # 2. re-check files and re-evaluate with the new parser
+    targets = sorted(set(plan["parse_failed"]) | set(plan["empty"]) | set(plan["download_failed"]))
+    for r in ctx.state.q("SELECT * FROM downloads WHERE status='ok'"):
+        if r["acronym"] in targets and r["raw_path"] and Path(r["raw_path"]).exists():
+            master = None
+            sj = ctx.state.one("SELECT submission_json FROM catalog WHERE acronym=?", (r["acronym"],))
+            if sj and sj["submission_json"]:
+                master = (json.loads(sj["submission_json"]) or {}).get("masterFileName")
+            prep = _prepare_eval_file(Path(r["raw_path"]), master)
+            ctx.state.exec("UPDATE downloads SET eval_path=?, sniffed_format=?, archive_type=?, archive_members=? "
+                           "WHERE acronym=? AND submission_id=?",
+                           (prep["eval_path"], prep["sniffed_format"], prep["archive_type"],
+                            prep["archive_members"], r["acronym"], r["submission_id"]))
+    if targets:
+        print(f"\n== Re-evaluating {len(targets)} ontologies with the 1.1 parser")
+        requeue(ctx, statuses=("parse_failed", "done", "error", "crashed", "gave_up"), acronyms=targets)
+        report["reparsed"] = evaluate_phase(ctx, only=targets)
+
+    # 3. alternate sources for anything still failing or empty
+    still = [a for a in targets
+             if not _is_good(ctx, a)
+             and (ctx.state.one("SELECT status FROM downloads WHERE acronym=?", (a,)) or {}).get("status") == "ok"]
+    if still:
+        print(f"\n== Trying alternate sources for {len(still)} ontologies: {still}")
+    for acr in still:
+        d = ctx.state.one("SELECT * FROM downloads WHERE acronym=?", (acr,))
+        sub = int(d["submission_id"])
+        e = _eval_row(ctx, acr)
+        if (e.get("error") or "").startswith("not_an_ontology"):
+            report["alternates"][acr] = "not an ontology; skipped"
+            continue
+        dest_dir = ctx.paths["downloads"] / safe_name(acr) / str(sub)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        tried = []
+        for variant, url, params, external in _alternate_sources(ctx, acr, sub, d["variant"]):
+            out = _fetch(ctx, acr, sub, variant, url, params, dest_dir, None, external=external)
+            tried.append(f"{variant}: {out['outcome']}")
+            if out["outcome"] != "ok":
+                continue
+            old_log = json.loads(d.get("attempts_log") or "[]")
+            ctx.state.upsert("downloads", {"acronym": acr, "submission_id": sub, **out["result"],
+                                           "finished_at": now(), "run_id": ctx.run_id,
+                                           "attempts_log": json.dumps(old_log + [out["entry"]])},
+                             ("acronym", "submission_id"))
+            requeue(ctx, statuses=("parse_failed", "done", "error", "crashed", "gave_up"), acronyms=[acr])
+            evaluate_phase(ctx, only=[acr])
+            if _is_good(ctx, acr):
+                tried.append("scored")
+                break
+        report["alternates"][acr] = tried
+        print(f"   {acr}: {' -> '.join(tried) if tried else 'no alternate sources'}")
+    ctx.event("repair", None, "INFO", json.dumps(report, default=str)[:3900])
+    return report
+
+
+def _older_bp_results(ctx: Ctx) -> list:
+    """Ontologies whose BioPortal-aware Define used extra properties under an older core version."""
+    out = []
+    for r in ctx.state.q("SELECT acronym, summary_json FROM evaluations WHERE status='done'"):
+        summ = json.loads(r["summary_json"] or "{}")
+        src = summ.get("define_bp_source") or ""
+        if "define_bp_score" in summ and src and not src.startswith("same_as_strict") \
+                and summ.get("core4_version") != core.CORE4_VERSION:
+            out.append(r["acronym"])
+    return sorted(out)
+
+
+def define_bp_phase(ctx: Ctx, full: bool = False) -> dict:
+    """Re-score ontologies whose definitions live in a property WiseOwl does not read.
+
+    Also re-scores ontologies whose BioPortal-aware Define was computed by an
+    older core version (1.1.1 ignores rdfs:isDefinedBy and link values).
+    full=True re-scores every scored ontology (about as long as the first run).
+    """
+    plan = plan_v11(ctx)
+    older = _older_bp_results(ctx)
+    for a in older:
+        plan["define_candidates"].append(a)
+        plan["define_reasons"][a] = "BioPortal-aware Define from an older version; re-score with 1.1.1 rules"
+    if full:
+        rows = ctx.state.q("SELECT acronym FROM evaluations WHERE status='done'")
+        cands = sorted(r["acronym"] for r in rows)
+    else:
+        cands = sorted(set(plan["define_candidates"]) | set(plan["flat_recheck"]))
+        for a in cands:
+            reason = plan["define_reasons"].get(a, "")
+            if a in plan["flat_recheck"]:
+                reason = (reason + "; " if reason else "") + "subclass cycles and shallow taxonomy: re-check Flat with a fixed hash seed"
+            print(f"  {a:<18} {reason}")
+    if not cands:
+        print("No ontologies need the BioPortal-aware Define.")
+        return {}
+    print(f"\n== Re-scoring {len(cands)} ontologies with version 1.1")
+    requeue(ctx, statuses=("done",), acronyms=cands)
+    return evaluate_phase(ctx, only=cands)
 
 
 def requeue(ctx: Ctx, statuses: tuple = ("timeout", "memory_limit", "gave_up", "error", "crashed"),
@@ -1095,7 +1409,13 @@ COLUMN_DOCS = {
     "eval_status": "done, parse_failed, timeout, memory_limit, memory_error, error, crashed, interrupted, gave_up, pending.",
     "eval_attempts": "How many times evaluation was started for this ontology.",
     "eval_seconds": "Wall time of the evaluation seen by the notebook, in seconds.",
-    "web_status": "Status for the web page: scored, not_downloadable, parse_failed, timed_out, too_large, failed, pending, no_submission.",
+    "web_status": "Status for the web page: scored, empty, not_an_ontology, not_downloadable, parse_failed, timed_out, too_large, failed, pending, no_submission.",
+    "define_bp_score": "BioPortal-aware Define (0-10): same formula as Define, but also reads the ontology's own definition property (BioPortal definitionProperty, or a property named/labelled 'definition').",
+    "define_bp_defined": "Entities with a definition under the BioPortal-aware property list.",
+    "define_bp_source": "Extra definition properties used for define_bp_score, or same_as_strict when there were none.",
+    "core_average_bp": "Mean of Describe, BioPortal-aware Define, Connection, Flat. The web page ranks by this.",
+    "core_average_bp_2dp": "core_average_bp rounded to 2 decimals.",
+    "empty_ontology": "True when the parsed file has no classes or individuals.",
     "describe_score": "WiseOwl Describe (0-10): 10 x share of entities with a descriptive annotation.",
     "define_score": "WiseOwl Define (0-10): 10 x mean of 0.4 x match + 0.6 x adequacy; undefined entities count as 0.",
     "connection_score": "WiseOwl Connection (0-10): 10 x (0.7 coverage + 0.2 diversity + 0.1 richness).",
@@ -1199,11 +1519,26 @@ def results_frame(ctx: Ctx):
         cat = cat.merge(ev, on=["acronym", "submission_id"], how="left")
     if "core_average" in cat.columns:
         cat["core_average_2dp"] = cat["core_average"].round(2)
+        if "define_bp_score" not in cat.columns:
+            cat["define_bp_score"] = float("nan")
+        if "define_bp_source" not in cat.columns:
+            cat["define_bp_source"] = None
+        scored = cat["core_average"].notna()
+        missing = scored & cat["define_bp_score"].isna()
+        cat.loc[missing, "define_bp_score"] = cat.loc[missing, "define_score"]
+        cat.loc[missing, "define_bp_source"] = "same_as_strict (1.0 result, not re-checked)"
+        cat["core_average_bp"] = (cat["describe_score"] + cat["define_bp_score"]
+                                  + cat["connection_score"] + cat["flat_score"]) / 4.0
+        cat["core_average_bp_2dp"] = cat["core_average_bp"].round(2)
 
     def web_status(row):
         if row.get("catalog_status") == "no_submission":
             return "no_submission"
         es = row.get("eval_status")
+        if es == "done" and row.get("entities") == 0:
+            return "empty"
+        if es == "parse_failed" and str(row.get("eval_error") or "").startswith("not_an_ontology"):
+            return "not_an_ontology"
         if isinstance(es, str) and es in WEB_STATUS:
             return WEB_STATUS[es]
         ds = row.get("download_status")
@@ -1249,9 +1584,12 @@ CREATE TABLE IF NOT EXISTS ontology_scores (
   status_detail TEXT,
   describe_score REAL,
   define_score REAL,
+  define_bp_score REAL,
+  define_bp_source TEXT,
   connection_score REAL,
   flat_score REAL,
   core_average REAL,
+  core_average_bp REAL,
   logical_consistency_score REAL,
   structural_dist_score REAL,
   semantic_dist_score REAL,
@@ -1266,6 +1604,7 @@ CREATE TABLE IF NOT EXISTS ontology_scores (
   PRIMARY KEY (provider, acronym)
 );
 CREATE INDEX IF NOT EXISTS idx_scores_avg ON ontology_scores(core_average);
+CREATE INDEX IF NOT EXISTS idx_scores_avg_bp ON ontology_scores(core_average_bp);
 CREATE INDEX IF NOT EXISTS idx_scores_status ON ontology_scores(status);
 CREATE TABLE IF NOT EXISTS keyword_cache (
   keyword TEXT NOT NULL,
@@ -1279,6 +1618,48 @@ CREATE TABLE IF NOT EXISTS keyword_cache (
 D1_FTS = """-- Optional full-text index for the local fallback search.
 CREATE VIRTUAL TABLE IF NOT EXISTS ontology_search USING fts5(provider, acronym, name, description, categories);
 """
+
+
+def d1_row(r: dict) -> dict:
+    """One ontology_scores row for D1 from a results_frame record (shared with the nightly job)."""
+    import math
+
+    def g(k):
+        v = r.get(k)
+        if isinstance(v, float) and math.isnan(v):
+            return None
+        if hasattr(v, "item"):  # numpy scalar -> Python
+            v = v.item()
+            if isinstance(v, float) and math.isnan(v):
+                return None
+        return v
+
+    def num(k, cast=float, nd=None):
+        v = g(k)
+        if v is None:
+            return None
+        v = cast(v)
+        return round(v, nd) if nd is not None else v
+
+    detail = g("eval_error") or g("download_error") or g("catalog_error")
+    return {
+        "provider": g("provider"), "acronym": g("acronym"), "name": g("name"),
+        "description": (g("bp_description") or "")[:2000] or None, "categories": g("bp_categories"),
+        "ontology_language": g("bp_language"),
+        "submission_id": num("submission_id", int),
+        "version": g("bp_version"), "released": g("bp_released"), "bioportal_url": g("bp_url"),
+        "file_sha256": g("download_sha256"), "status": g("web_status"),
+        "status_detail": str(detail)[:300] if detail else None,
+        "describe_score": num("describe_score"), "define_score": num("define_score"),
+        "define_bp_score": num("define_bp_score"), "define_bp_source": g("define_bp_source"),
+        "connection_score": num("connection_score"), "flat_score": num("flat_score"),
+        "core_average": num("core_average", float, 4), "core_average_bp": num("core_average_bp", float, 4),
+        "logical_consistency_score": None, "structural_dist_score": None, "semantic_dist_score": None,
+        "triple_count": num("triple_count", int), "entity_count": num("entities", int),
+        "class_count": num("classes", int),
+        "wiseowl_version": g("wiseowl_source_version"), "core4_version": g("core4_version"),
+        "device": g("define_device"), "evaluated_at": g("eval_finished_at"), "updated_at": now(),
+    }
 
 
 def export_phase(ctx: Ctx) -> dict:
@@ -1298,7 +1679,8 @@ def export_phase(ctx: Ctx) -> dict:
         ctx.event("export", None, "WARNING", f"parquet skipped: {exc}")
 
     score_cols = ["provider", "acronym", "name", "web_status", "describe_score", "define_score",
-                  "connection_score", "flat_score", "core_average", "core_average_2dp", "weakest_metric",
+                  "define_bp_score", "connection_score", "flat_score", "core_average", "core_average_2dp",
+                  "core_average_bp", "core_average_bp_2dp", "define_bp_source", "weakest_metric",
                   "bp_categories", "bp_language", "submission_id", "bp_version", "bp_released", "bp_url"]
     df[[c for c in score_cols if c in df.columns]].to_csv(exp / "scores_compact.csv", index=False)
     files["scores_compact.csv"] = "One row per ontology with the four scores and web status."
@@ -1357,35 +1739,7 @@ def export_phase(ctx: Ctx) -> dict:
     lines = []
     fts_lines = []
     for r in df.to_dict("records"):
-        def g(k):
-            v = r.get(k)
-            try:
-                import math
-                if isinstance(v, float) and math.isnan(v):
-                    return None
-            except Exception:  # noqa: BLE001
-                pass
-            return v
-        detail = g("eval_error") or g("download_error") or g("catalog_error")
-        row = {
-            "provider": g("provider"), "acronym": g("acronym"), "name": g("name"),
-            "description": (g("bp_description") or "")[:2000] or None, "categories": g("bp_categories"),
-            "ontology_language": g("bp_language"),
-            "submission_id": int(g("submission_id")) if g("submission_id") is not None else None,
-            "version": g("bp_version"), "released": g("bp_released"), "bioportal_url": g("bp_url"),
-            "file_sha256": g("download_sha256"), "status": g("web_status"),
-            "status_detail": str(detail)[:300] if detail else None,
-            "describe_score": g("describe_score"), "define_score": g("define_score"),
-            "connection_score": g("connection_score"),
-            "flat_score": float(g("flat_score")) if g("flat_score") is not None else None,
-            "core_average": round(g("core_average"), 4) if g("core_average") is not None else None,
-            "logical_consistency_score": None, "structural_dist_score": None, "semantic_dist_score": None,
-            "triple_count": int(g("triple_count")) if g("triple_count") is not None else None,
-            "entity_count": int(g("entities")) if g("entities") is not None else None,
-            "class_count": int(g("classes")) if g("classes") is not None else None,
-            "wiseowl_version": g("wiseowl_source_version"), "core4_version": g("core4_version"),
-            "device": g("define_device"), "evaluated_at": g("eval_finished_at"), "updated_at": now(),
-        }
+        row = d1_row(r)
         lines.append(f"INSERT OR REPLACE INTO ontology_scores ({', '.join(row)}) VALUES "
                      f"({', '.join(_sql(v) for v in row.values())});")
         fts_lines.append("INSERT INTO ontology_search (provider, acronym, name, description, categories) VALUES "
@@ -1406,7 +1760,8 @@ def export_phase(ctx: Ctx) -> dict:
         "web_status_counts": df.web_status.value_counts().to_dict(),
         "status": status(ctx),
         "score_stats": {c: core._stats(scored[c].dropna().to_numpy()) for c in
-                        ("describe_score", "define_score", "connection_score", "flat_score", "core_average")
+                        ("describe_score", "define_score", "define_bp_score", "connection_score", "flat_score",
+                         "core_average", "core_average_bp")
                         if c in scored.columns},
         "config": ctx.cfg,
     }

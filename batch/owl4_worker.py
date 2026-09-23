@@ -86,6 +86,7 @@ def worker_main(task_q, result_q, cfg: dict) -> None:
             "cuda_available": torch.cuda.is_available(),
             "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
             "python": sys.version.split()[0], "platform": platform.platform(),
+            "python_hash_seed": os.environ.get("PYTHONHASHSEED"),
         }
         log.info("worker ready: %s", info)
         result_q.put(info)
@@ -134,10 +135,19 @@ def run_task(task: dict, encoder, fallback, cfg: dict, log, core, torch) -> dict
             min_tokens=cfg["define_min_tokens"], depth_target=cfg["depth_target"],
             branch_target=cfg["branch_target"], suggestion_threshold=cfg["suggestion_threshold"],
             want_entities=cfg["save_entity_tables"], entity_rows_max=cfg["entity_rows_max"],
-            fallback_encoder=fallback, on_stage=on_stage)
+            fallback_encoder=fallback, on_stage=on_stage,
+            extra_definition_props=task.get("extra_definition_props"),
+            use_owlready2=cfg.get("use_owlready2", True))
     except core.OntologyParseError as exc:
+        attempts = getattr(exc, "attempts", [])
+        try:
+            core.dump_json({"task": task, "error": str(exc), "attempts": attempts},
+                           os.path.join(out_dir, "parse_failure.json"))
+        except Exception:  # noqa: BLE001
+            pass
         return {**base, "status": "parse_failed", "error_type": "OntologyParseError",
-                "error": str(exc)[:2000], "stage": "parse", **_peak_rss_mb()}
+                "error": str(exc)[:2000], "traceback": json.dumps(attempts)[:4000],
+                "stage": "parse", **_peak_rss_mb()}
     except MemoryError as exc:
         return {**base, "status": "memory_error", "error_type": "MemoryError",
                 "error": str(exc)[:2000], "traceback": traceback.format_exc()[-4000:], **_peak_rss_mb()}
@@ -158,6 +168,7 @@ def run_task(task: dict, encoder, fallback, cfg: dict, log, core, torch) -> dict
     summary["encoder_device"] = str(encoder.device)
     summary["encoder_batch_size"] = encoder.batch_size
     summary["torch_version"] = torch.__version__
+    summary["python_hash_seed"] = os.environ.get("PYTHONHASHSEED")
     try:
         import transformers
         summary["transformers_version"] = transformers.__version__

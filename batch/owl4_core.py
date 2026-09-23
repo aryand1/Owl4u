@@ -8,6 +8,13 @@ and the core part of reporting.py.
 The score math is unchanged. The additions only record more detail:
 per-metric counts, per-entity values, timings, and memory use.
 
+Version 1.1 adds (strict WiseOwl scores are unchanged):
+* define_bp: a second Define score that also reads each ontology's own
+  definition property (from BioPortal metadata, or detected by name, such as
+  NCIT's "DEFINITION" property P97). The strict Define is still reported.
+* owlready2 fallback parser for OWL/XML and for RDF/XML that rdflib rejects.
+* Every parse attempt's error is recorded.
+
 Two engineering changes, neither of which changes the formulas:
 1. Define streams the definition vectors batch by batch and compares each
    batch with its label vectors, so very large ontologies do not need all
@@ -40,7 +47,7 @@ from rdflib.namespace import DCTERMS, OWL, RDF, RDFS, SKOS, Namespace
 log = logging.getLogger("owl4.core")
 
 WISEOWL_SOURCE_VERSION = "0.10.0"
-CORE4_VERSION = "core4-1.0"
+CORE4_VERSION = "core4-1.1.1"
 
 Node = Union[URIRef, BNode, Literal]
 Pair = tuple
@@ -240,11 +247,51 @@ def _collect_classes(by_type: Mapping, by_predicate: Mapping) -> frozenset:
 
 PARSE_FORMATS: Sequence = (None, "xml", "turtle", "n3", "nt", "trig", "trix")
 RDFLIB_FORMATS = {"xml", "turtle", "n3", "nt", "trig", "trix", "json-ld", "nquads"}
-UNSUPPORTED_FORMATS = {"obo", "owlxml", "ofn", "omn", "html", "zip", "gzip", "empty"}
+UNSUPPORTED_FORMATS = {"obo", "ofn", "omn", "html", "zip", "gzip", "empty", "office_document"}
+NOT_AN_ONTOLOGY_FORMATS = {"html", "office_document"}
 
 
 class OntologyParseError(ValueError):
-    pass
+    def __init__(self, message: str, attempts: list | None = None) -> None:
+        super().__init__(message)
+        self.attempts = attempts or []
+
+
+def parse_with_owlready2(path: str, kind: str) -> rdflib.Graph:
+    """Convert RDF/XML or OWL/XML with owlready2's standalone parsers (no imports loaded)."""
+    if kind == "owlxml":
+        from owlready2.owlxml_2_ntriples import parse as o2_parse
+    else:
+        from owlready2.rdfxml_2_ntriples import parse as o2_parse
+    graph = rdflib.Graph()
+    add = graph.add
+    bnodes: dict = {}
+
+    def node(x: str):
+        if x.startswith("_:"):
+            b = bnodes.get(x)
+            if b is None:
+                b = bnodes[x] = BNode()
+            return b
+        return URIRef(x)
+
+    def on_obj(s, p, o):
+        add((node(s), URIRef(p), node(o)))
+
+    def on_data(s, p, o, d):
+        if d and d.startswith("@"):
+            lit = Literal(o, lang=d[1:])
+        elif d:
+            lit = Literal(o, datatype=URIRef(d))
+        else:
+            lit = Literal(o)
+        add((node(s), URIRef(p), lit))
+
+    with open(path, "rb") as fh:
+        o2_parse(fh, on_prepare_obj=on_obj, on_prepare_data=on_data)
+    if len(graph) == 0:
+        raise ValueError("owlready2 read 0 triples")
+    return graph
 
 
 def sniff_format(path: str, head_bytes: int = 65536) -> str | None:
@@ -254,6 +301,13 @@ def sniff_format(path: str, head_bytes: int = 65536) -> str | None:
     if not raw.strip():
         return "empty"
     if raw[:2] == b"PK":
+        try:
+            import zipfile
+            with zipfile.ZipFile(path) as zf:
+                if "[Content_Types].xml" in zf.namelist():
+                    return "office_document"
+        except Exception:  # noqa: BLE001
+            pass
         return "zip"
     if raw[:2] == b"\x1f\x8b":
         return "gzip"
@@ -283,17 +337,21 @@ def sniff_format(path: str, head_bytes: int = 65536) -> str | None:
     return None
 
 
-def parse_graph(path: str, first_format: str | None = None) -> tuple:
+def parse_graph(path: str, first_format: str | None = None, *, use_owlready2: bool = True) -> tuple:
     """Parse the file. Returns (graph, format_used, attempts).
 
-    Tries ``first_format`` (from sniffing) first, then WiseOwl's own list.
+    Tries ``first_format`` (from sniffing) first, then WiseOwl's own list,
+    then owlready2 (RDF/XML or OWL/XML) if rdflib could not read the file.
     """
     path = os.fspath(path)
-    order: list = []
-    if first_format in RDFLIB_FORMATS:
-        order.append(first_format)
-    order.extend(f for f in PARSE_FORMATS if f not in order)
     attempts: list = []
+    if first_format == "owlxml":
+        order: list = []
+    else:
+        order = []
+        if first_format in RDFLIB_FORMATS:
+            order.append(first_format)
+        order.extend(f for f in PARSE_FORMATS if f not in order)
     last_error: Exception | None = None
     for fmt in order:
         graph = rdflib.Graph()
@@ -311,10 +369,22 @@ def parse_graph(path: str, first_format: str | None = None) -> tuple:
         attempts.append({"format": fmt or "auto", "ok": True,
                          "seconds": round(time.perf_counter() - t0, 3)})
         return graph, fmt or "auto", attempts
+    if use_owlready2 and first_format in ("xml", "owlxml", None, "trix"):
+        kind = "owlxml" if first_format == "owlxml" else "rdfxml"
+        t0 = time.perf_counter()
+        try:
+            graph = parse_with_owlready2(path, kind)
+            attempts.append({"format": f"owlready2:{kind}", "ok": True,
+                             "seconds": round(time.perf_counter() - t0, 3)})
+            return graph, f"owlready2:{kind}", attempts
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            attempts.append({"format": f"owlready2:{kind}", "ok": False,
+                             "seconds": round(time.perf_counter() - t0, 3),
+                             "error": f"{type(exc).__name__}: {str(exc)[:300]}"})
+    tried = ", ".join(a["format"] for a in attempts)
     raise OntologyParseError(
-        f"{path}: unsupported format (tried {', '.join(f or 'auto' for f in order)}). "
-        f"Last error: {last_error}"
-    )
+        f"unsupported format (tried {tried}). Last error: {last_error}", attempts)
 
 
 # =============================================================================
@@ -568,21 +638,41 @@ def _stats(arr) -> dict:
     }
 
 
+def _definition_text(index: OntologyIndex, entity, props: tuple, literal_only: frozenset) -> str:
+    """Same joining as OntologyIndex.definition(strip_each=False); props in literal_only keep text values only."""
+    parts: list = []
+    for prop in props:
+        for o in index.objects(entity, prop):
+            if prop in literal_only and not isinstance(o, Literal):
+                continue
+            parts.append(str(o))
+    return " ".join(parts).strip()
+
+
 def compute_define(index: OntologyIndex, entities: list, encoder: ClsEncoder, *,
                    min_tokens: int = 12,
-                   fallback_encoder: Callable[[], ClsEncoder] | None = None) -> tuple:
-    """Define = 10 * mean(0.4*match + 0.6*adequacy) (WiseOwl metrics/define.py)."""
+                   fallback_encoder: Callable[[], ClsEncoder] | None = None,
+                   props: tuple = DEFINE_DEFINITION_PROPS,
+                   literal_only: frozenset = frozenset()) -> tuple:
+    """Define = 10 * mean(0.4*match + 0.6*adequacy) (WiseOwl metrics/define.py).
+
+    ``props`` is WiseOwl's definition property list for the strict score; the
+    BioPortal-aware score passes a longer list.
+    """
     n = len(entities)
     details: dict = {"entities": n}
     if not entities:
         details.update(defined=0, reason="no entities")
         return 0.0, details, None
 
-    definitions = [index.definition(e, DEFINE_DEFINITION_PROPS, strip_each=False) for e in entities]
+    if literal_only:
+        definitions = [_definition_text(index, e, props, literal_only) for e in entities]
+    else:
+        definitions = [index.definition(e, props, strip_each=False) for e in entities]
     defined_idx = [i for i, d in enumerate(definitions) if d.strip()]
     source_use = Counter()
     for i in defined_idx:
-        for prop in DEFINE_DEFINITION_PROPS:
+        for prop in props:
             if index.objects(entities[i], prop):
                 source_use[str(prop)] += 1
     if not defined_idx:
@@ -676,6 +766,55 @@ def compute_define(index: OntologyIndex, entities: list, encoder: ClsEncoder, *,
     ent["define_match"][di] = match
     ent["define_adequacy"][di] = adequacy
     return score, details, ent
+
+
+_DEFINITION_NAMES = {"definition", "def", "defn", "textualdefinition", "definitions"}
+
+
+def detect_definition_properties(index: OntologyIndex) -> dict:
+    """Properties named or labelled "definition" (e.g. NCIT P97, efo:definition) outside WiseOwl's list."""
+    found: dict = {}
+    for p, pairs in index.predicate_groups():
+        if p in DEFINE_DEFINITION_PROPS or not isinstance(p, URIRef):
+            continue
+        names = [local_name(str(p))] + index.texts(p, RDFS.label) + index.texts(p, SKOS.prefLabel)
+        norm = {re.sub(r"[^a-z]", "", n.lower()) for n in names}
+        if not norm & _DEFINITION_NAMES:
+            continue
+        sample = pairs[:1000]
+        literals = sum(1 for _, o in sample if isinstance(o, Literal))
+        if sample and literals >= 0.8 * len(sample):
+            found[p] = len(pairs)
+    return found
+
+
+# Properties that point to where a term is defined, not to definition text.
+NOT_DEFINITION_TEXT = frozenset({RDFS.isDefinedBy, RDFS.seeAlso, OWL.sameAs})
+
+
+def bp_definition_props(index: OntologyIndex, extra_iris: Iterable | None) -> tuple:
+    """WiseOwl's list + BioPortal's declared definition property + detected ones.
+
+    Returns (props, sources). Extra properties only contribute text values
+    (see compute_define literal_only); rdfs:isDefinedBy and similar are ignored.
+    """
+    props = list(DEFINE_DEFINITION_PROPS)
+    sources: dict = {}
+    for iri in extra_iris or ():
+        u = URIRef(str(iri))
+        if u in NOT_DEFINITION_TEXT:
+            sources[str(u)] = "ignored: links to a defining document, not definition text"
+            continue
+        if u not in props:
+            props.append(u)
+            sources[str(u)] = "bioportal_definitionProperty"
+    for p, n in detect_definition_properties(index).items():
+        if p not in props:
+            props.append(p)
+            sources[str(p)] = f"detected_by_name ({n} uses)"
+        elif str(p) in sources:
+            sources[str(p)] += " + detected_by_name"
+    return tuple(props), sources
 
 
 # ---------------------------------------------------------------- Connection
@@ -811,8 +950,16 @@ def build_taxonomy(index: OntologyIndex) -> dict:
     return parent_to_children
 
 
-def max_taxonomy_depth(parent_to_children: dict) -> tuple:
-    """Longest downward path (in nodes), cycle-safe. Also returns back-edge count."""
+def max_taxonomy_depth(parent_to_children: dict, deterministic: bool = False) -> tuple:
+    """Longest downward path (in nodes), cycle-safe. Also returns back-edge count.
+
+    WiseOwl visits classes in Python set order, which changes between processes,
+    so an ontology with subclass cycles can get a different depth on each run.
+    The batch worker fixes this by starting Python with a fixed hash seed, which
+    keeps WiseOwl's exact algorithm (default deterministic=False). deterministic=True
+    visits classes in sorted IRI order instead; it is stable but can differ from
+    WiseOwl on ontologies with cycles, so it is off by default.
+    """
     depth: dict = {}
     back_edges = [0]
 
@@ -840,18 +987,22 @@ def max_taxonomy_depth(parent_to_children: dict) -> tuple:
                 on_stack.discard(node)
                 continue
             stack.append((node, True))
-            stack.extend((c, False) for c in children if c not in depth)
+            if deterministic:
+                stack.extend((c, False) for c in sorted(children, key=str, reverse=True) if c not in depth)
+            else:
+                stack.extend((c, False) for c in children if c not in depth)
         return depth.get(root, 1)
 
-    max_depth = max((depth_of(p) for p in parent_to_children), default=0)
+    parents = sorted(parent_to_children, key=str) if deterministic else parent_to_children
+    max_depth = max((depth_of(p) for p in parents), default=0)
     return max_depth, back_edges[0]
 
 
 def compute_flat(index: OntologyIndex, entities: list, *, depth_target: int = 5,
-                 branch_target: int = 3) -> tuple:
+                 branch_target: int = 3, deterministic: bool = False) -> tuple:
     """Flat = round((depth score + breadth score) / 2) (metrics/flat.py)."""
     taxonomy = build_taxonomy(index)
-    max_depth, back_edges = max_taxonomy_depth(taxonomy)
+    max_depth, back_edges = max_taxonomy_depth(taxonomy, deterministic)
     avg_branch = sum(len(c) for c in taxonomy.values()) / len(taxonomy) if taxonomy else 0.0
     depth_score = min(max_depth / depth_target, 1.0) * 10
     breadth_score = min(avg_branch / branch_target, 1.0) * 10
@@ -986,7 +1137,9 @@ def evaluate_file(path: str, encoder: ClsEncoder, *, min_tokens: int = 12, depth
                   branch_target: int = 3, suggestion_threshold: float = 4.0,
                   want_entities: bool = True, entity_rows_max: int | None = None,
                   fallback_encoder: Callable[[], ClsEncoder] | None = None,
-                  on_stage: Callable[[str], None] | None = None) -> dict:
+                  on_stage: Callable[[str], None] | None = None,
+                  extra_definition_props: Iterable | None = None,
+                  use_owlready2: bool = True) -> dict:
     """Parse, index and score one ontology file with the four core metrics.
 
     Returns {"summary": flat dict, "details": nested dict, "entities": DataFrame | None}.
@@ -997,8 +1150,9 @@ def evaluate_file(path: str, encoder: ClsEncoder, *, min_tokens: int = 12, depth
 
     sniffed = timer.run("sniff", lambda: sniff_format(path))
     if sniffed in UNSUPPORTED_FORMATS:
-        raise OntologyParseError(f"unsupported_format:{sniffed}")
-    graph, fmt, attempts = timer.run("parse", lambda: parse_graph(path, sniffed))
+        kind = "not_an_ontology" if sniffed in NOT_AN_ONTOLOGY_FORMATS else "unsupported_format"
+        raise OntologyParseError(f"{kind}:{sniffed}", [{"format": sniffed, "ok": False, "error": "skipped by sniffing"}])
+    graph, fmt, attempts = timer.run("parse", lambda: parse_graph(path, sniffed, use_owlready2=use_owlready2))
     oid = timer.run("identity", lambda: ontology_id(graph, path))
     index = timer.run("index", lambda: OntologyIndex.from_graph(graph))
     del graph
@@ -1011,6 +1165,18 @@ def evaluate_file(path: str, encoder: ClsEncoder, *, min_tokens: int = 12, depth
     define, df_det, df_ent = timer.run(
         "define", lambda: compute_define(index, entities, encoder, min_tokens=min_tokens,
                                          fallback_encoder=fallback_encoder))
+    bp_props, bp_sources = bp_definition_props(index, extra_definition_props)
+    extra_props = frozenset(p for p in bp_props if p not in DEFINE_DEFINITION_PROPS)
+    if bp_props == tuple(DEFINE_DEFINITION_PROPS):
+        define_bp, dbp_det, dbp_ent = define, {"same_as_strict": True, "defined": df_det.get("defined")}, None
+        bp_source = "same_as_strict"
+    else:
+        define_bp, dbp_det, dbp_ent = timer.run(
+            "define_bp", lambda: compute_define(index, entities, encoder, min_tokens=min_tokens,
+                                                fallback_encoder=fallback_encoder, props=bp_props,
+                                                literal_only=extra_props))
+        bp_source = "; ".join(f"{k} [{v}]" for k, v in bp_sources.items())
+    dbp_det["extra_properties"] = bp_sources
     connection, c_det, c_ent = timer.run("connection", lambda: compute_connection(index, entities))
     flat, f_det, f_ent = timer.run(
         "flat", lambda: compute_flat(index, entities, depth_target=depth_target,
@@ -1019,6 +1185,7 @@ def evaluate_file(path: str, encoder: ClsEncoder, *, min_tokens: int = 12, depth
     scores = {"describe_score": describe, "define_score": define,
               "connection_score": connection, "flat_score": flat}
     core_average = sum(scores.values()) / 4.0
+    core_average_bp = (describe + define_bp + connection + flat) / 4.0
     weakest = min(scores.items(), key=lambda kv: kv[1])[0]
     tips = suggestions(scores, suggestion_threshold)
 
@@ -1040,6 +1207,9 @@ def evaluate_file(path: str, encoder: ClsEncoder, *, min_tokens: int = 12, depth
                 if src:
                     for k, v in src.items():
                         cols[k] = np.asarray(v)[sel]
+            if dbp_ent:
+                cols["has_definition_bp"] = np.asarray(dbp_ent["has_definition"])[sel]
+                cols["define_bp_value"] = np.asarray(dbp_ent["define_value"])[sel]
             return pd.DataFrame(cols)
         entities_df = timer.run("entities_table", build_entities)
 
@@ -1071,6 +1241,12 @@ def evaluate_file(path: str, encoder: ClsEncoder, *, min_tokens: int = 12, depth
         "define_definitions_truncated": df_det.get("definitions_truncated_at_bert_max_length"),
         "define_device": df_det.get("device"),
         "define_gpu_oom_fallback": df_det.get("gpu_oom_fallback"),
+        "define_bp_score": define_bp,
+        "define_bp_defined": dbp_det.get("defined"),
+        "define_bp_source": bp_source,
+        "core_average_bp": core_average_bp,
+        "core_average_bp_2dp": round(core_average_bp, 2),
+        "empty_ontology": len(entities) == 0,
         "connection_coverage": c_det.get("coverage"),
         "connection_diversity": c_det.get("diversity"),
         "connection_richness": c_det.get("richness"),
@@ -1095,11 +1271,14 @@ def evaluate_file(path: str, encoder: ClsEncoder, *, min_tokens: int = 12, depth
     details = {
         "scores": scores,
         "core_average": core_average,
+        "define_bp_score": define_bp,
+        "core_average_bp": core_average_bp,
         "ontology_id": list(oid),
         "parse": {"sniffed_format": sniffed, "format_used": fmt, "attempts": attempts},
         "stats": stats,
         "describe": d_det,
         "define": df_det,
+        "define_bp": dbp_det,
         "connection": c_det,
         "flat": f_det,
         "timings_seconds": timer.marks,
