@@ -1,0 +1,72 @@
+acronym,name,web_status,catalog_status,catalog_error,download_status,download_http_status,download_error,eval_status,eval_error_type,eval_error,eval_stage_at_failure,eval_attempts,eval_bytes,bp_classes,bp_language
+ADMF,alzhaimer dessiese main factors,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+BCMO,Breast Cancer-Microbiome Ontology ,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+BLLM,Large Language Model Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+BOSHI,boshra,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+BPFORMS,"Ontology of chemically concrete, composable DNA, RNA, and protein residue and crosslinks",parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,unsupported_format:obo,parse,1.0,1603954.0,0.0,OBO
+C19M,COVID-19,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+CATALOG-THEMES,Catalog Themes,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"C:\owl4_run\downloads\CATALOG-THEMES\3\CATALOG-THEMES_3_rdf.xrdf: unsupported format (tried xml, auto, turtle, n3, nt, trig, trix). Last error: file:///C:/owl4_run/downloads/CATALOG-THEMES/3/CATALOG-THEMES_3_rdf.xrdf:2:0: syntax error",parse,1.0,8898.0,0.0,SKOS
+CCO,Cell Cycle Ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,unsupported_format:obo,parse,1.0,256083060.0,264891.0,OBO
+CEDARPC,CEDAR Provisional Classes,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+CHEBI,Chemical Entities of Biological Interest Ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,unsupported_format:obo,parse,1.0,270898581.0,238248.0,OBO
+CHEMBIO,Systems Chemical Biology and Chemogenomics Ontology ,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+CO,Crop Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+CPT,CPT - Current Procedural Terminology,not_downloadable,ok,,summary_only,,,,,,,,,14403.0,UMLS
+CS,Coping Strategies for Adverse Drug Events Ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,unsupported_format:owlxml,parse,1.0,11978763.0,0.0,OWL
+DMTO,Diabetes Mellitus Treatment Ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,unsupported_format:empty,parse,1.0,0.0,10700.0,OWL
+DRMO,Dental Restorative Material Ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"C:\owl4_run\downloads\DRMO\1\DRMO_1_rdf.xrdf: unsupported format (tried xml, auto, turtle, n3, nt, trig, trix). Last error: file:///C:/owl4_run/downloads/DRMO/1/DRMO_1_rdf.xrdf:2:0: Only elements in the TriX namespace are allowed. http://www.w3.org/1999/02/22-rdf-syntax-ns#!=http://www.w3.org/2004/03/trix/trix-1/",parse,1.0,419797.0,253.0,OWL
+DSAV,Digital Specimen Accessibility Vocabulary,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+FARMACI,FARMACI AIFA,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+FASTO,HL7 FHIR and SSN ontology based Type 1 Diabetes Mellitus Ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,unsupported_format:empty,parse,1.0,0.0,9577.0,OWL
+FITBIT,Fitbit Vocabulary,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+FLUXO,Metabolic Flux Analysis Ontology,failed,ok,,html_response,200.0,server returned HTML,,,,,,,,OWL
+GAZ,Gazetteer,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,unsupported_format:obo,parse,1.0,189228723.0,668838.0,OBO
+GECCO,COVID-19 Common Datamodel,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"C:\owl4_run\downloads\GECCO\1\GECCO_1_rdf.xrdf: unsupported format (tried xml, auto, turtle, n3, nt, trig, trix). Last error: file:///C:/owl4_run/downloads/GECCO/1/GECCO_1_rdf.xrdf:2:0: Only elements in the TriX namespace are allowed. http://www.w3.org/1999/02/22-rdf-syntax-ns#!=http://www.w3.org/2004/03/trix/trix-1/",parse,1.0,10972312.0,5383.0,OWL
+GENEVIEVE,Charlotte,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+HC,Habronattus Courtship Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+HCMO,Home Cage Monitoring Ontology,failed,ok,,html_response,200.0,server returned HTML,,,,,,,,OWL
+HERO,Healthcare Monitoring and Emergency Response Ontology,not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for HERO""],""status"":403}",,,,,,,1205.0,OWL
+HIV,HIV ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,unsupported_format:obo,parse,1.0,2411067.0,0.0,OBO
+HIVHPV,HIVHPV,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+HIVHPVSTOM,HIVHPVStom,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+HMADO,Human Microbiome Associated Disease Ontology ,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+HSCLO38,Homo sapiens Chromosomal Location Ontology for GRCh38,failed,ok,,not_found,404.0,"{""errors"":[""No source file is available for this submission""],""status"":404}",,,,,,,,OWL
+ICD10,"International Classification of Diseases, Version 10",not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for ICD10""],""status"":403}",,,,,,,12445.0,UMLS
+ICNP,International Classification for Nursing Practice,not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for ICNP""],""status"":403}",,,,,,,4476.0,OWL
+ICPC2P,International Classification of Primary Care - 2 PLUS,not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for ICPC2P""],""status"":403}",,,,,,,7537.0,UMLS
+INFRA-EN,Infrastructure,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+IVAN,IVAN OTERO,not_downloadable,ok,,summary_only,,,,,,,,,0.0,OWL
+JSO,JS Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+KUSIIMA,naava,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+LIB,MWS-WSM,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+LIBRARY,wsm24,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+LSFC,LSFC,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+M,May,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+MDDB,Master Drug Data Base Clinical Drugs,not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for MDDB""],""status"":403}",,,,,,,13817.0,UMLS
+METAMESH,Meta Mesh Ontology,not_downloadable,ok,,summary_only,,,,,,,,,79.0,OWL
+MIRNAO,MicroRNA Ontology,not_downloadable,ok,,summary_only,,,,,,,,,676.0,OWL
+MM,mm,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+NCOD,NCoD,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"C:\owl4_run\downloads\NCOD\1\NCOD_1_rdf.xrdf: unsupported format (tried xml, auto, turtle, n3, nt, trig, trix). Last error: file:///C:/owl4_run/downloads/NCOD/1/NCOD_1_rdf.xrdf:2:0: syntax error",parse,1.0,1973898.0,0.0,SKOS
+NDDF,National Drug Data File,not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for NDDF""],""status"":403}",,,,,,,33583.0,UMLS
+NDFRT,National Drug File - Reference Terminology,not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for NDFRT""],""status"":403}",,,,,,,36202.0,UMLS
+NHSQI2009,NHS Quality Indicators,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+NIC,Nursing Interventions Classification,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+ODENTIFYHUMAN,Ontology for Forensic Human Identification by Dental Evidence and Source Conclusions,not_downloadable,ok,,summary_only,,,,,,,,,,OWL
+OTO, Obesity Tracking Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+PEO_ONTOLOGY,Prompt Engineering Ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"C:\owl4_run\downloads\PEO_ONTOLOGY\3\PEO_ONTOLOGY_3_rdf.xrdf: unsupported format (tried xml, auto, turtle, n3, nt, trig, trix). Last error: file:///C:/owl4_run/downloads/PEO_ONTOLOGY/3/PEO_ONTOLOGY_3_rdf.xrdf:2:0: Only elements in the TriX namespace are allowed. http://www.w3.org/1999/02/22-rdf-syntax-ns#!=http://www.w3.org/2004/03/trix/trix-1/",parse,1.0,345486.0,124.0,OWL
+PHARMGKB,PharmGKB Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+PHENOMEBLAST,PhenomeBLAST Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+PPLC,Placental Pathology Lesion Classification,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,unsupported_format:owlxml,parse,1.0,1425582.0,156.0,OWL
+PR,Protein Ontology,failed,ok,,failed,200.0,"stream failed: ChunkedEncodingError: ('Connection broken: IncompleteRead(1074454528 bytes read, 204960142 more expected)', IncompleteRead(1074454528 bytes read, 204960142 more expected))",,,,,,,332990.0,OWL
+RADMO,RADx Metadata Ontology,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+RCD,"Read Codes, Clinical Terms Version 3 (CTV3) ",not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for RCD""],""status"":403}",,,,,,,140065.0,UMLS
+RGD,RRB Group D,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+SALMO,Salmonella Serotype vocabulary,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+SIMON,Simple Measurement Ontology,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"C:\owl4_run\downloads\SIMON\1\SIMON_1_rdf.xrdf: unsupported format (tried xml, auto, turtle, n3, nt, trig, trix). Last error: file:///C:/owl4_run/downloads/SIMON/1/SIMON_1_rdf.xrdf:2:0: Only elements in the TriX namespace are allowed. http://www.w3.org/1999/02/22-rdf-syntax-ns#!=http://www.w3.org/2004/03/trix/trix-1/",parse,1.0,563680.0,41.0,OWL
+SNOMEDCT,"SNOMED CT, US Edition",not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for SNOMEDCT""],""status"":403}",,,,,,,382297.0,UMLS
+SOIL-PROF,Soil Profile classifiers,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"C:\owl4_run\downloads\SOIL-PROF\3\SOIL-PROF_3_rdf.xrdf: unsupported format (tried xml, auto, turtle, n3, nt, trig, trix). Last error: file:///C:/owl4_run/downloads/SOIL-PROF/3/SOIL-PROF_3_rdf.xrdf:2:0: Only elements in the TriX namespace are allowed. http://www.w3.org/1999/02/22-rdf-syntax-ns#!=http://www.w3.org/2004/03/trix/trix-1/",parse,1.0,1177675.0,19.0,SKOS
+TESTONTOLO,Test_data,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+VODANETHIOPIA_OR,ETHIOPIA_OUTPATIENT,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"C:\owl4_run\downloads\VODANETHIOPIA_OR\4\extracted\xl\worksheets\sheet1.xml: unsupported format (tried xml, auto, turtle, n3, nt, trig, trix). Last error: file:///C:/owl4_run/downloads/VODANETHIOPIA_OR/4/extracted/xl/worksheets/sheet1.xml:2:0: Only elements in the TriX namespace are allowed. http://schemas.openxmlformats.org/spreadsheetml/2006/main!=http://www.w3.org/2004/03/trix/trix-1/",parse,1.0,17813.0,,SKOS
+WHO-ART,World Health Organization (WHO) Adverse Reaction Terminology,not_downloadable,ok,,not_downloadable,403.0,"{""errors"":[""License restrictions on download for WHO-ART""],""status"":403}",,,,,,,1851.0,UMLS
+WSM-LIBRARY,MWS,no_submission,no_submission,latest_submission http=200 ,,,,,,,,,,,
+YUNPING,yunping,parse_failed,ok,,ok,200.0,,parse_failed,OntologyParseError,"C:\owl4_run\downloads\YUNPING\1\YUNPING_1_rdf.xrdf: unsupported format (tried xml, auto, turtle, n3, nt, trig, trix). Last error: file:///C:/owl4_run/downloads/YUNPING/1/YUNPING_1_rdf.xrdf:2:0: Only elements in the TriX namespace are allowed. http://www.w3.org/1999/02/22-rdf-syntax-ns#!=http://www.w3.org/2004/03/trix/trix-1/",parse,1.0,246570.0,2.0,OWL

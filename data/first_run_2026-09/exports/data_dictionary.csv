@@ -1,0 +1,165 @@
+column,dtype,non_null,description
+provider,str,1289,Ontology source (bioportal for now).
+acronym,str,1289,BioPortal ontology acronym (primary key per provider).
+name,str,1289,Ontology name from BioPortal.
+submission_id,int64,1289,BioPortal submission id that was downloaded and scored (-1 if none).
+catalog_status,str,1289,"ok, no_submission, or error when fetching metadata."
+catalog_error,str,27,Error text when BioPortal metadata could not be fetched.
+catalog_fetched_at,str,1289,When the BioPortal metadata was fetched (UTC).
+bp_viewing_restriction,str,1289,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_summary_only,object,1076,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_flat,object,331,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_is_view,bool,1289,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_view_of,object,0,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_categories,str,1289,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_groups,str,1289,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_ontology_type,str,1289,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_language,str,1262,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_version,str,1043,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_released,str,1262,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_creation_date,str,1262,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_modification_date,str,97,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_submission_status,str,1289,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_status,str,1216,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_description,str,1289,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_homepage,str,703,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_documentation,str,370,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_publication,str,1289,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_ontology_uri,object,0,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_natural_language,str,1262,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_master_file_name,str,14,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_pull_location,str,415,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_contact_names,str,1289,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_classes,float64,1257,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_individuals,float64,1257,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_properties,float64,1257,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_max_depth,float64,1257,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_max_child_count,float64,1257,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_average_child_count,float64,1257,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_classes_with_one_child,float64,1257,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_classes_with_more_than_25_children,float64,1257,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_classes_with_no_definition,float64,1257,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+bp_url,str,1289,"BioPortal metadata (ontology record, latest submission, or BioPortal metrics endpoint)."
+download_status,str,1262,"ok, not_downloadable (license 401/403), private, summary_only, skipped_too_large, not_found, html_response, failed."
+download_variant,str,1236,"Which download worked: rdf:submission, rdf:latest, original:submission, or local."
+download_http_status,float64,1250,Download detail.
+download_url,str,1236,Download detail.
+download_raw_path,str,1236,Download detail.
+download_eval_path,str,1236,Download detail.
+download_bytes,float64,1236,Size of the downloaded file in bytes.
+eval_bytes,float64,1236,Size of the file that was parsed (after unzip).
+download_sha256,str,1236,SHA-256 of the downloaded file.
+download_content_type,str,1236,Download detail.
+download_server_filename,str,1236,Download detail.
+download_sniffed_format,str,1236,Download detail.
+download_archive_type,str,4,Download detail.
+download_archive_members,str,3,Download detail.
+download_attempts,float64,1262,Download detail.
+download_started_at,str,1262,Download detail.
+download_finished_at,str,1262,Download detail.
+download_seconds,float64,1250,Download detail.
+download_error,str,14,Download detail.
+download_attempts_log,str,1250,Download detail.
+download_run_id,str,1262,Download detail.
+eval_status,str,1236,"done, parse_failed, timeout, memory_limit, memory_error, error, crashed, interrupted, gave_up, pending."
+eval_attempts,float64,1236,How many times evaluation was started for this ontology.
+eval_started_at,str,1236,"Evaluation bookkeeping (status, times, errors, file paths)."
+eval_finished_at,str,1236,"Evaluation bookkeeping (status, times, errors, file paths)."
+eval_seconds,float64,1236,"Wall time of the evaluation seen by the notebook, in seconds."
+eval_error_type,str,18,"Evaluation bookkeeping (status, times, errors, file paths)."
+eval_error,str,18,"Evaluation bookkeeping (status, times, errors, file paths)."
+eval_traceback,object,0,"Evaluation bookkeeping (status, times, errors, file paths)."
+eval_stage_at_failure,str,18,"Evaluation bookkeeping (status, times, errors, file paths)."
+describe_score,float64,1218,WiseOwl Describe (0-10): 10 x share of entities with a descriptive annotation.
+define_score,float64,1218,WiseOwl Define (0-10): 10 x mean of 0.4 x match + 0.6 x adequacy; undefined entities count as 0.
+connection_score,float64,1218,WiseOwl Connection (0-10): 10 x (0.7 coverage + 0.2 diversity + 0.1 richness).
+flat_score,float64,1218,WiseOwl Flat (integer 0-10): round((depth score + breadth score) / 2).
+core_average,float64,1218,"Mean of the four core scores, full precision (the WiseOwl average)."
+eval_result_path,str,1218,"Evaluation bookkeeping (status, times, errors, file paths)."
+eval_entities_path,str,1212,"Evaluation bookkeeping (status, times, errors, file paths)."
+eval_parent_peak_rss_mb,float64,1236,"Evaluation bookkeeping (status, times, errors, file paths)."
+eval_timeout_min,float64,1236,"Evaluation bookkeeping (status, times, errors, file paths)."
+eval_run_id,str,1236,"Evaluation bookkeeping (status, times, errors, file paths)."
+ontology_iri,str,1218,"owl:Ontology IRI in the file, or a file hash if none is declared."
+version_iri,str,1218,"owl:versionIRI, or a file hash if none is declared."
+sniffed_format,str,1218,Format detected from file content before parsing.
+parse_format,str,1218,rdflib format that parsed the file.
+parse_attempts,float64,1218,How many rdflib formats were tried before one worked.
+triple_count,float64,1218,Number of RDF triples in the parsed file (imports are not followed).
+subjects,float64,1218,Distinct RDF subjects in the file.
+distinct_predicates,float64,1218,Distinct RDF predicates in the file.
+classes,float64,1218,"WiseOwl class set (typed classes, subClassOf participants, SKOS concepts)."
+named_classes,float64,1218,classes minus owl:Thing and owl:Nothing.
+individuals,float64,1218,Subjects typed with a class that are not classes.
+entities,float64,1218,Classes plus individuals: the population the metrics score.
+annotation_properties,float64,1218,Subjects typed owl:AnnotationProperty (they count as Describe signals).
+object_properties_declared,float64,1218,Subjects typed owl:ObjectProperty.
+datatype_properties_declared,float64,1218,Subjects typed owl:DatatypeProperty.
+owl_classes_typed,float64,1218,Subjects typed owl:Class.
+rdfs_classes_typed,float64,1218,Subjects typed rdfs:Class.
+skos_concepts,float64,1218,Subjects typed skos:Concept (WiseOwl counts them as classes).
+owl_restrictions,float64,1218,Subjects typed owl:Restriction.
+subclassof_triples,float64,1218,rdfs:subClassOf triples.
+equivalentclass_triples,float64,1218,owl:equivalentClass triples.
+deprecated_entities,float64,1218,Entities marked owl:deprecated true (still counted by WiseOwl).
+owl_imports_count,float64,1218,Number of owl:imports; imported ontologies are not loaded or scored.
+core_average_2dp,float64,1218,"core_average rounded to 2 decimals, as the WiseOwl dashboard shows it."
+weakest_metric,str,1218,Core metric with the lowest score.
+suggestions,str,1218,WiseOwl suggestion sentences for metrics below the threshold.
+summary_banner,str,1218,WiseOwl summary sentence (core part).
+describe_described,float64,1218,Entities counted as described.
+describe_share,float64,1212,Describe metric detail.
+define_defined,float64,1218,Entities with a non-empty definition.
+define_share,float64,987,Define metric detail.
+define_cosine_mean,float64,987,Mean BERT label/definition cosine (used for the z-score).
+define_cosine_std,float64,987,Std of the cosines (used for the z-score).
+define_match_mean,float64,987,Define metric detail.
+define_adequacy_mean,float64,987,Define metric detail.
+define_definitions_truncated,float64,987,Definitions cut at the BERT max length (128 tokens).
+define_device,str,987,Device used for Define (cuda or cpu; cpu after a GPU memory fallback).
+define_gpu_oom_fallback,float64,0,Define metric detail.
+connection_coverage,float64,1212,Share of entities with at least one object-property link.
+connection_diversity,float64,1212,"Mean of min(distinct properties / 5, 1)."
+connection_richness,float64,1212,"Mean of min(log11(links + 1), 1)."
+connection_connected,float64,1212,Connection metric detail.
+connection_object_properties,float64,1212,Connection metric detail.
+connection_links_triples,float64,1212,Connection metric detail.
+connection_links_restrictions,float64,1212,Connection metric detail.
+flat_max_depth,float64,1218,Longest root-to-leaf path in the class taxonomy (in nodes).
+flat_avg_branching,float64,1218,Mean children per parent in the class taxonomy.
+flat_depth_score,float64,1218,Flat metric detail.
+flat_breadth_score,float64,1218,Flat metric detail.
+flat_parents,float64,1218,Flat metric detail.
+flat_edges,float64,1218,Flat metric detail.
+flat_cycle_back_edges,float64,1218,Flat metric detail.
+time_sniff,float64,1218,Seconds spent in this stage of the evaluation.
+time_parse,float64,1218,Seconds spent in this stage of the evaluation.
+time_identity,float64,1218,Seconds spent in this stage of the evaluation.
+time_index,float64,1218,Seconds spent in this stage of the evaluation.
+time_stats,float64,1218,Seconds spent in this stage of the evaluation.
+time_describe,float64,1218,Seconds spent in this stage of the evaluation.
+time_define,float64,1218,Seconds spent in this stage of the evaluation.
+time_connection,float64,1218,Seconds spent in this stage of the evaluation.
+time_flat,float64,1218,Seconds spent in this stage of the evaluation.
+time_entities_table,float64,1212,Seconds spent in this stage of the evaluation.
+time_total,float64,1218,Seconds spent in this stage of the evaluation.
+define_seconds_encode_labels,float64,987,Define metric detail.
+define_seconds_encode_definitions,float64,987,Define metric detail.
+entity_rows_written,float64,1218,Rows written to entities.csv.gz for this ontology.
+wiseowl_source_version,str,1218,WiseOwl version the metric code was copied from.
+core4_version,str,1218,Version of this four-metric copy.
+gpu_peak_allocated_mb,float64,1218,Peak GPU memory allocated by PyTorch during this ontology.
+gpu_peak_reserved_mb,float64,1218,Peak GPU memory reserved by PyTorch during this ontology.
+rss_mb_now,float64,1218,Worker RAM right after this ontology finished.
+process_lifetime_peak_mb,float64,1218,Windows only: peak RAM of the worker process since it started.
+bert_name,str,1218,Hugging Face model used by Define.
+mixed_precision,object,1218,Whether fp16/bf16 autocast was on (off keeps WiseOwl parity).
+encoder_device,str,1218,Device the BERT encoder was loaded on.
+encoder_batch_size,float64,1218,BERT batch size.
+torch_version,str,1218,PyTorch version in the worker.
+transformers_version,str,1218,transformers version in the worker.
+rdflib_version,str,1218,rdflib version in the worker.
+time_write_outputs,float64,1218,Seconds spent in this stage of the evaluation.
+wall_seconds,float64,1218,Evaluation wall time seen by the notebook.
+parent_peak_rss_mb,float64,1218,Peak worker RAM seen by the notebook while this ontology ran.
+web_status,str,1289,"Status for the web page: scored, not_downloadable, parse_failed, timed_out, too_large, failed, pending, no_submission."
