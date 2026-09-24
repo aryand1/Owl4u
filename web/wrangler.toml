@@ -13,7 +13,7 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "owl4u"
-database_id = "REPLACE_WITH_YOUR_DATABASE_ID"
+database_id = "306e5151-576d-4b9d-9f3f-b7b7ad10f548"
 
 [vars]
 BIOPORTAL_API = "https://data.bioontology.org"
