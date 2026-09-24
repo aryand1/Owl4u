@@ -1,0 +1,8 @@
+# CPU-only torch is installed separately in the workflow (smaller and faster to install).
+transformers>=4.40
+rdflib>=7.0
+owlready2
+numpy
+pandas
+requests
+psutil

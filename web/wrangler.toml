@@ -1,0 +1,22 @@
+# Cloudflare Worker for the Owl4u search page.
+# Replace database_id after running: npx wrangler d1 create owl4u
+name = "owl4u"
+main = "src/worker.js"
+compatibility_date = "2025-09-01"
+
+# The web page (public/index.html) is served as static files;
+# /api/* requests go to the Worker.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "owl4u"
+database_id = "REPLACE_WITH_YOUR_DATABASE_ID"
+
+[vars]
+BIOPORTAL_API = "https://data.bioontology.org"
+BIOPORTAL_TIMEOUT_MS = "1300"
+BIOPORTAL_PAGESIZE = "100"
+# BIOPORTAL_API_KEY is a secret: npx wrangler secret put BIOPORTAL_API_KEY
