@@ -1,0 +1,22 @@
+# run data that stays local
+downloads/
+results/
+raw/
+logs/
+nightly_work/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.parquet
+*.gz
+results_detail.jsonl
+
+# web tooling
+web/.wrangler/
+web/node_modules/
+web/.dev.vars
+
+# python / jupyter
+__pycache__/
+.ipynb_checkpoints/
+.env
