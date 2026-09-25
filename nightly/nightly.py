@@ -77,6 +77,15 @@ def fail(title: str, message: str) -> None:
 
 def preflight(bioportal_api: str) -> bool:
     """Check secrets and connections before any work, with a plain-English reason on failure."""
+    # Pasted secrets often carry a stray line break or space, which breaks HTTP headers.
+    for k in SECRETS:
+        raw = os.environ.get(k) or ""
+        if raw != raw.strip():
+            print(f"::warning title=Trimmed secret::{k} had leading or trailing spaces or line breaks; they were removed for this run.")
+        os.environ[k] = raw.strip()
+        if any(ch.isspace() for ch in os.environ[k]):
+            fail("Secret has more than one line", f"{k} contains a space or line break in the middle. Edit the secret and paste only the single value, on one line.")
+            return False
     missing = [k for k in SECRETS if not (os.environ.get(k) or "").strip()]
     if missing:
         for k in missing:
