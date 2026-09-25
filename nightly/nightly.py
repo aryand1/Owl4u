@@ -62,6 +62,57 @@ class D1:
         raise RuntimeError("D1 kept failing")
 
 
+SECRETS = {
+    "BIOPORTAL_API_KEY": "your BioPortal API key (bioportal.bioontology.org > Account)",
+    "CLOUDFLARE_API_TOKEN": "a Cloudflare API token with Account > D1 > Edit permission",
+    "CLOUDFLARE_ACCOUNT_ID": "your Cloudflare account ID",
+    "D1_DATABASE_ID": "the ID of the owl4u D1 database",
+}
+
+
+def fail(title: str, message: str) -> None:
+    """Print a GitHub error annotation, shown at the top of the run page."""
+    print(f"::error title={title}::{message}")
+
+
+def preflight(bioportal_api: str) -> bool:
+    """Check secrets and connections before any work, with a plain-English reason on failure."""
+    missing = [k for k in SECRETS if not (os.environ.get(k) or "").strip()]
+    if missing:
+        for k in missing:
+            fail("Missing secret", f"{k} is empty. Add {SECRETS[k]} under Settings > Secrets and variables > Actions > New repository secret.")
+        return False
+
+    try:
+        D1().query("SELECT 1 AS ok")
+    except (RuntimeError, requests.RequestException) as e:
+        msg = str(e)
+        if "10000" in msg or "Authentication" in msg:
+            fail("Cloudflare rejected the token", "CLOUDFLARE_API_TOKEN is wrong or lacks permission. Create a token with Account > D1 > Edit and update the secret.")
+        elif "7003" in msg or "7404" in msg or "Could not route" in msg or "not found" in msg.lower():
+            fail("D1 database not found", "Check CLOUDFLARE_ACCOUNT_ID and D1_DATABASE_ID; one of them does not match your Cloudflare account.")
+        else:
+            fail("Cannot reach the D1 database", msg[:400])
+        return False
+    print("Preflight: D1 database reachable.")
+
+    try:
+        r = requests.get(f"{bioportal_api.rstrip('/')}/ontologies",
+                         params={"display_links": "false", "display_context": "false", "include": "acronym"},
+                         headers={"Authorization": f"apikey token={os.environ['BIOPORTAL_API_KEY']}"}, timeout=60)
+    except requests.RequestException as e:
+        fail("Cannot reach BioPortal", f"{type(e).__name__}: {e}")
+        return False
+    if r.status_code in (401, 403):
+        fail("BioPortal rejected the API key", "BIOPORTAL_API_KEY is wrong. Copy the key from your BioPortal account page and update the secret.")
+        return False
+    if not r.ok:
+        fail("BioPortal error", f"BioPortal returned HTTP {r.status_code}; it may be down. Re-run the workflow later.")
+        return False
+    print("Preflight: BioPortal key accepted.")
+    return True
+
+
 def main() -> int:
     max_n = int(os.environ.get("MAX_ONTOLOGIES") or 60)
     only = {a.strip().upper() for a in (os.environ.get("ONLY_ACRONYMS") or "").split(",") if a.strip()}
@@ -76,6 +127,8 @@ def main() -> int:
         "keep_awake": False,
         "heartbeat_s": 120,
     }
+    if not preflight(cfg["bioportal_api"]):
+        return 1
     ctx = P.init(cfg, api_key=os.environ["BIOPORTAL_API_KEY"])
     d1 = D1()
 
