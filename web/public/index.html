@@ -22,6 +22,7 @@
   --mid:  #8a5a0b;  --mid-bg:  #f6e7c8;
   --low:  #a23b37;  --low-bg:  #f5dcda;
   --none: #5f6b6e;  --none-bg: #e3e8e6;
+  --fair: #6452a3;  --fair-bg: #e8e2f6;
   --bar: #9fb3ad;
   --serif: "Source Serif 4", "Iowan Old Style", Georgia, "Times New Roman", serif;
   --sans: "Public Sans", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
@@ -35,6 +36,7 @@
     --bg: #151b1d; --surface: #1c2427; --ink: #e4ebe8; --muted: #9aa9a6; --rule: #2e3a3d; --link: #8db7e0; --on-link: #0f1c26;
     --good: #7fd3a2; --good-bg: #1d3a2a; --mid: #e8bf6a; --mid-bg: #3a2e14;
     --low: #f0928c; --low-bg: #42211f; --none: #aab5b3; --none-bg: #283235; --bar: #4f6b64;
+    --fair: #c2b2f0; --fair-bg: #30284b;
   }
 }
 *, *::before, *::after { box-sizing: inherit; }
@@ -59,6 +61,7 @@ button, select {
 select { background: var(--surface); color: var(--ink); border-color: var(--rule); padding: .45rem .6rem; }
 .controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem;
             margin: 1.25rem 0 .5rem; color: var(--muted); font-size: .92rem; }
+.controls[hidden] { display: none; }
 .controls label { display: flex; align-items: center; gap: .5rem; }
 .note { background: var(--mid-bg); color: var(--ink); border-radius: 6px; padding: .6rem .8rem; margin: .5rem 0; font-size: .92rem; }
 .error { background: var(--low-bg); }
@@ -80,6 +83,8 @@ ol.results > li { border-bottom: 1px solid var(--rule); }
 .badge.good { background: var(--good-bg); color: var(--good); }
 .badge.mid  { background: var(--mid-bg);  color: var(--mid); }
 .badge.low  { background: var(--low-bg);  color: var(--low); }
+.badge.fair { background: var(--fair-bg); color: var(--fair); }
+.badges { display: inline-flex; flex-wrap: wrap; gap: .4rem; }
 
 button.more { background: none; border: 0; color: var(--link); padding: 0; font-size: .9rem; text-decoration: underline; }
 .details { grid-column: 1 / -1; margin: .5rem 0 .25rem; padding: .9rem 1rem; background: var(--surface);
@@ -93,6 +98,15 @@ button.more { background: none; border: 0; color: var(--link); padding: 0; font-
 .metrics .fill { height: 100%; background: var(--bar); }
 .details p { margin: .4rem 0; }
 .details .meta { color: var(--muted); }
+.details h3 { font: 600 1rem var(--serif); margin: 1rem 0 .45rem; }
+.details h3:first-child { margin-top: 0; }
+.fair-block { border-top: 1px solid var(--rule); margin-top: .9rem; padding-top: .1rem; }
+.fair-block summary { color: var(--link); cursor: pointer; margin: .55rem 0; }
+.fair-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .35rem .85rem; }
+.fair-sub { display: flex; justify-content: space-between; gap: .5rem; padding: .18rem 0; border-bottom: 1px dotted var(--rule); }
+.fair-sub b { font-variant-numeric: tabular-nums; }
+.fair-actions { margin: .45rem 0 .25rem; padding-left: 1.2rem; }
+.fair-actions li { margin: .25rem 0; }
 
 .legend { margin-top: 2.5rem; color: var(--muted); font-size: .88rem; max-width: 40rem; }
 .legend h3 { font: 600 1rem var(--serif); color: var(--ink); margin: 0 0 .4rem; }
@@ -116,7 +130,7 @@ button.more { background: none; border: 0; color: var(--link); padding: 0; font-
 <div class="wrap">
   <header>
     <h1>Find an ontology for your topic</h1>
-    <p>Type a keyword to see which BioPortal ontologies cover it. Results are ordered by how well they match, and each one carries its WiseOwl quality score so you can choose between them.</p>
+    <p>Type a keyword to see which BioPortal ontologies cover it. Compare both the ontology's WiseOwl content quality and its FAIR metadata score.</p>
   </header>
 
   <form class="search" role="search" id="form">
@@ -130,6 +144,7 @@ button.more { background: none; border: 0; color: var(--link); padding: 0; font-
     <label>Sort by
       <select id="sort">
         <option value="relevance">Match to your keyword</option>
+        <option value="fair">FAIR score</option>
         <option value="average_bp">WiseOwl average</option>
         <option value="describe">Describe</option>
         <option value="define_bp">Define</option>
@@ -145,7 +160,8 @@ button.more { background: none; border: 0; color: var(--link); padding: 0; font-
     <h3 id="how">How to read the results</h3>
     <p><strong>Match</strong> compares ontologies for this keyword only: 1.00 is the best match. It counts the ontology's matching terms, gives more weight to terms BioPortal ranks higher, and adds a bonus when a term's name is exactly your keyword.</p>
     <p><strong>Quality</strong> is the WiseOwl average of four scores from 0 to 10: Describe (terms have labels and descriptions), Define (definitions exist and fit their labels), Connection (terms are linked by relations), and Flat (the hierarchy has depth and branching). "#2 of 9" is the rank among the scored results for this search.</p>
-    <p>Badge color follows the score itself, not the rank:
+    <p><strong>FAIR</strong> is a 0–100 metadata and publication score covering Findable, Accessible, Interoperable, and Reusable. Owl4u evaluates the 61-question O’FAIRe grid locally, uses its published 478-credit weighting, and records the evidence for all 15 FAIR sub-principles. Checks that need live web probing or human judgement receive no credit and are identified in the details.</p>
+    <p>The <strong>Quality</strong> badge color follows the score itself, not the rank:
       <span class="sw" style="background:var(--good)"></span>7 or higher,
       <span class="sw" style="background:var(--mid)"></span>5 to 7,
       <span class="sw" style="background:var(--low)"></span>below 5,
@@ -173,17 +189,32 @@ function band(v) { return v === null || v === undefined ? "" : v >= 7 ? "good" :
 function sorted(results, key) {
   const copy = results.slice();
   if (key === "relevance") return copy.sort((a, b) => b.relevance - a.relevance);
+  if (key === "fair") {
+    const fair = (r) => r.fair && r.fair.score !== null && r.fair.score !== undefined ? r.fair.score : -1;
+    return copy.sort((a, b) => fair(b) - fair(a) || b.relevance - a.relevance);
+  }
   const val = (r) => (r.scores && r.scores[key] !== null && r.scores[key] !== undefined ? r.scores[key] : -1);
   return copy.sort((a, b) => val(b) - val(a) || b.relevance - a.relevance);
 }
 
-function badge(r, key) {
+function qualityBadge(r, key) {
   if (!r.scores) return `<span class="badge">${esc(STATUS_TEXT[r.status] || "Not scored")}</span>`;
-  const metric = key === "relevance" ? "average_bp" : key;
+  const metric = key === "relevance" || key === "fair" ? "average_bp" : key;
   const v = r.scores[metric];
   const rank = r.ranks && r.ranks[metric];
   const what = metric === "average_bp" ? "Quality" : METRIC_LABEL[metric];
   return `<span class="badge ${band(v)}">${esc(what)} #${rank} of ${r.scored_count}, ${metric === "average_bp" ? "average " : ""}<b>${fmt(v, metric === "flat" ? 0 : 2)}</b></span>`;
+}
+
+function fairBadge(r) {
+  if (!r.fair) return `<span class="badge">FAIR not assessed</span>`;
+  return `<span class="badge fair">FAIR #${r.fair.rank} of ${r.fair_count} <b>${fmt(r.fair.score, 1)}</b>/100</span>`;
+}
+
+function badges(r, key) {
+  return key === "fair"
+    ? `<span class="badges">${fairBadge(r)}${qualityBadge(r, key)}</span>`
+    : `<span class="badges">${qualityBadge(r, key)}${fairBadge(r)}</span>`;
 }
 
 function why(r) {
@@ -200,6 +231,32 @@ function metricRow(label, v, extra = "") {
          `<dd><div class="track" aria-hidden="true"><div class="fill" style="width:${w}%"></div></div>${extra}</dd>`;
 }
 
+function fairMetricRow(label, v) {
+  const w = v === null || v === undefined ? 0 : Math.max(0, Math.min(100, v));
+  return `<dt>${esc(label)}</dt><dd class="val">${fmt(v, 1)}</dd>` +
+         `<dd><div class="track" aria-hidden="true"><div class="fill" style="width:${w}%;background:var(--fair)"></div></div></dd>`;
+}
+
+function fairDetails(r) {
+  if (!r.fair) return "";
+  const f = r.fair;
+  const codes = ["F", "A", "I", "R"];
+  const rows = codes.map((code) => fairMetricRow(f.principles[code].name, f.principles[code].score)).join("");
+  const subs = codes.map((code) => {
+    const principle = f.principles[code];
+    return principle.subprinciples.map((sub) =>
+      `<div class="fair-sub"><span><b>${esc(sub.id)}</b> ${esc(sub.label)}</span><b>${fmt(sub.score, 1)}</b></div>`
+    ).join("");
+  }).join("");
+  const actions = (f.recommendations || []).slice(0, 4).map((item) => `<li>${esc(item.action)}</li>`).join("");
+  const limitations = (f.limitations || []).join(" ");
+  return `<div class="fair-block"><h3>FAIR assessment — ${fmt(f.score, 1)}/100</h3>` +
+    `<dl class="metrics">${rows}</dl>` +
+    `<details><summary>Show all 15 FAIR sub-principles</summary><div class="fair-grid">${subs}</div></details>` +
+    (actions ? `<p><strong>Highest-impact improvements</strong></p><ul class="fair-actions">${actions}</ul>` : "") +
+    `<p class="meta">${esc(f.method)} ${esc(f.version || "")}; ${esc(f.basis)}. ${esc(limitations)}</p></div>`;
+}
+
 function details(r) {
   let html = "";
   if (r.scores) {
@@ -211,6 +268,7 @@ function details(r) {
   } else if (r.status_detail) {
     html += `<p class="meta">${esc(r.status_detail)}</p>`;
   }
+  html += fairDetails(r);
   if (r.description) html += `<p>${esc(r.description)}${r.description.length >= 400 ? "…" : ""}</p>`;
   const meta = [];
   if (r.categories && r.categories.length) meta.push(`Categories: ${esc(r.categories.join(", ").replace(/_/g, " "))}`);
@@ -238,7 +296,7 @@ function render() {
     return `<li><div class="row">
       <h2>${esc(r.name)}<span class="acr">${esc(r.acronym)}</span></h2>
       <div class="rel"><strong>${fmt(r.relevance)}</strong>match</div>
-      <div class="line2">${badge(r, state.sort)}<span class="why">${why(r)}</span>
+      <div class="line2">${badges(r, state.sort)}<span class="why">${why(r)}</span>
         <button class="more" type="button" aria-expanded="${open}" aria-controls="${id}" data-acr="${esc(r.acronym)}">${open ? "Hide details" : "Show details"}</button></div>
       <div class="details" id="${id}" ${open ? "" : "hidden"}>${details(r)}</div>
     </div></li>`;
@@ -264,8 +322,9 @@ async function run(q, push = true) {
     if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
     state.data = data;
     const scored = data.results.filter((r) => r.scores).length;
+    const fair = data.results.filter((r) => r.fair).length;
     const via = { bioportal: "BioPortal", cache: "saved search", stale_cache: "earlier search", fallback: "name search" }[data.source] || data.source;
-    $("summary").textContent = `${data.count} ${data.count === 1 ? "ontology" : "ontologies"} matched "${data.keyword}", ${scored} with quality scores (${data.took_ms} ms, ${via}).`;
+    $("summary").textContent = `${data.count} ${data.count === 1 ? "ontology" : "ontologies"} matched "${data.keyword}", ${scored} with quality scores and ${fair} with FAIR scores (${data.took_ms} ms, ${via}).`;
     if (data.note) $("notes").innerHTML = `<p class="note">${esc(data.note)}</p>`;
   } catch (err) {
     state.data = null;

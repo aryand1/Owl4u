@@ -55,6 +55,22 @@ Check that the scores are there:
 npx wrangler d1 execute owl4u --remote --command "SELECT status, COUNT(*) AS n FROM ontology_scores GROUP BY status"
 ```
 
+For a database created before FAIR scoring was added, migrate and backfill it once before deploying the new Worker:
+
+```powershell
+npx wrangler d1 execute owl4u --remote --file=migrations\0002_fair_scores.sql
+python ..\batch\backfill_fair.py ..\data\run_v1_1_1\exports\ontology_results_full.csv
+npx wrangler d1 execute owl4u --remote --file=..\data\run_v1_1_1\exports\fair_backfill.sql
+```
+
+Do not run the migration against a new database whose `d1_schema.sql` already contains the `fair_*` columns. Future batch exports write FAIR values directly into `d1_data.sql`, so the backfill is only for older result files.
+
+Check the FAIR values:
+
+```powershell
+npx wrangler d1 execute owl4u --remote --command "SELECT COUNT(*) AS assessed, ROUND(AVG(fair_score), 1) AS average_fair FROM ontology_scores WHERE fair_score IS NOT NULL"
+```
+
 ### 4. Add the BioPortal API key and publish
 
 ```powershell
@@ -108,7 +124,7 @@ After that it runs by itself every day at 07:17 UTC.
 
 - Compares BioPortal's latest submission of every ontology with what is in D1, and scores only new ontologies and new submissions (at most 60 per run; the rest wait for the next run).
 - Runs on a CPU-only GitHub runner with 16 GB of RAM. Files over 0.75 GB are skipped, because the largest ontologies (NCIT, MESH, BERO, DRON, DDSS) need more memory than the runner has. For those, the old scores stay on the page and the run summary lists them under "Run these on the GPU machine". Score them with the notebook (`P.evaluate_phase(ctx, only=[...])` after a download), then reload the D1 files as above.
-- Uses the same code as the notebook (`batch/owl4_*.py`), including the 1.1 repairs and the fixed hash seed.
+- Uses the same code as the notebook (`batch/owl4_*.py`), including the 1.1 repairs, the FAIR profile, and the fixed hash seed.
 
 ### Things to know
 

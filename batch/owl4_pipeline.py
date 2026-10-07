@@ -32,8 +32,9 @@ from typing import Any
 import requests
 
 import owl4_core as core
+import owl4_fair as fair
 
-NOTEBOOK_VERSION = "owl4-batch-1.1.1"
+NOTEBOOK_VERSION = "owl4-batch-1.2.0"
 
 DEFAULT_CONFIG: dict = {
     # where everything goes
@@ -470,6 +471,11 @@ def catalog_frame(ctx: Ctx):
             "bp_classes_with_more_than_25_children": m.get("classesWithMoreThan25Children"),
             "bp_classes_with_no_definition": m.get("classesWithNoDefinition"),
             "bp_url": f"{ctx.cfg['bioportal_ui']}/{r['acronym']}",
+            # Kept only until results_frame has built the FAIR assessment; the
+            # raw payloads are dropped before CSV/D1 export.
+            "_fair_ontology_json": r["ontology_json"],
+            "_fair_submission_json": r["submission_json"],
+            "_fair_metrics_json": r["metrics_json"],
         })
     return pd.DataFrame(rows)
 
@@ -1415,6 +1421,15 @@ COLUMN_DOCS = {
     "define_bp_source": "Extra definition properties used for define_bp_score, or same_as_strict when there were none.",
     "core_average_bp": "Mean of Describe, BioPortal-aware Define, Connection, Flat. The web page ranks by this.",
     "core_average_bp_2dp": "core_average_bp rounded to 2 decimals.",
+    "fair_score": "Owl4u FAIR profile overall score (0-100), aligned to O'FAIRe's 61-question, 478-credit grid.",
+    "fair_findable": "Findable principle score (0-100).",
+    "fair_accessible": "Accessible principle score (0-100).",
+    "fair_interoperable": "Interoperable principle score (0-100).",
+    "fair_reusable": "Reusable principle score (0-100).",
+    "fair_credits": "Credits earned in the O'FAIRe-aligned 478-credit grid.",
+    "fair_max_credits": "Maximum FAIR credits (478).",
+    "fair_version": "Version of the deterministic Owl4u FAIR scoring profile.",
+    "fair_assessment_json": "Full structured overall, principle, sub-principle, check, evidence and recommendation results; D1 stores a compact web summary.",
     "empty_ontology": "True when the parsed file has no classes or individuals.",
     "describe_score": "WiseOwl Describe (0-10): 10 x share of entities with a descriptive annotation.",
     "define_score": "WiseOwl Define (0-10): 10 x mean of 0.4 x match + 0.6 x adequacy; undefined entities count as 0.",
@@ -1436,6 +1451,13 @@ COLUMN_DOCS = {
     "individuals": "Subjects typed with a class that are not classes.",
     "deprecated_entities": "Entities marked owl:deprecated true (still counted by WiseOwl).",
     "owl_imports_count": "Number of owl:imports; imported ontologies are not loaded or scored.",
+    "labelled_entities": "Entities with an rdfs:label or skos:prefLabel (FAIR evidence).",
+    "formally_defined_entities": "Entities participating in an equivalent-class axiom or subclass restriction (FAIR evidence).",
+    "entities_with_provenance": "Entities with a recognized DC Terms, PROV-O or PAV provenance annotation.",
+    "qualified_cross_reference_triples": "Entity-to-external-IRI links using non-structural predicates.",
+    "external_reference_namespaces": "Distinct namespaces used by qualified external IRI references.",
+    "ontology_metadata_predicates": "Distinct metadata predicates on declared owl:Ontology resources.",
+    "ontology_metadata_standard_predicates": "Ontology metadata predicates from DC Terms, PROV-O, PAV, VANN, VOAF, MOD or FOAF.",
     "describe_described": "Entities counted as described.",
     "define_defined": "Entities with a non-empty definition.",
     "define_cosine_mean": "Mean BERT label/definition cosine (used for the z-score).",
@@ -1551,6 +1573,19 @@ def results_frame(ctx: Ctx):
         return "pending"
     cat["web_status"] = cat.apply(web_status, axis=1)
     cat.insert(0, "provider", ctx.cfg["provider"])
+    fair_results = [fair.assess_record(row) for row in cat.to_dict("records")]
+    cat["fair_score"] = [result["score"] for result in fair_results]
+    cat["fair_findable"] = [result["principles"]["F"]["score"] for result in fair_results]
+    cat["fair_accessible"] = [result["principles"]["A"]["score"] for result in fair_results]
+    cat["fair_interoperable"] = [result["principles"]["I"]["score"] for result in fair_results]
+    cat["fair_reusable"] = [result["principles"]["R"]["score"] for result in fair_results]
+    cat["fair_credits"] = [result["credits"] for result in fair_results]
+    cat["fair_max_credits"] = fair.FAIR_MAX_CREDITS
+    cat["fair_version"] = fair.FAIR_SCORE_VERSION
+    cat["fair_assessment_json"] = [json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+                                   for result in fair_results]
+    cat = cat.drop(columns=["_fair_ontology_json", "_fair_submission_json", "_fair_metrics_json"],
+                   errors="ignore")
     return cat
 
 
@@ -1590,6 +1625,15 @@ CREATE TABLE IF NOT EXISTS ontology_scores (
   flat_score REAL,
   core_average REAL,
   core_average_bp REAL,
+  fair_score REAL,
+  fair_findable REAL,
+  fair_accessible REAL,
+  fair_interoperable REAL,
+  fair_reusable REAL,
+  fair_credits REAL,
+  fair_max_credits REAL,
+  fair_version TEXT,
+  fair_assessment_json TEXT,
   logical_consistency_score REAL,
   structural_dist_score REAL,
   semantic_dist_score REAL,
@@ -1605,6 +1649,7 @@ CREATE TABLE IF NOT EXISTS ontology_scores (
 );
 CREATE INDEX IF NOT EXISTS idx_scores_avg ON ontology_scores(core_average);
 CREATE INDEX IF NOT EXISTS idx_scores_avg_bp ON ontology_scores(core_average_bp);
+CREATE INDEX IF NOT EXISTS idx_scores_fair ON ontology_scores(fair_score);
 CREATE INDEX IF NOT EXISTS idx_scores_status ON ontology_scores(status);
 CREATE TABLE IF NOT EXISTS keyword_cache (
   keyword TEXT NOT NULL,
@@ -1613,6 +1658,19 @@ CREATE TABLE IF NOT EXISTS keyword_cache (
   fetched_at TEXT NOT NULL,
   PRIMARY KEY (keyword, provider)
 );
+"""
+
+D1_FAIR_MIGRATION = """-- One-time migration for an Owl4u D1 database created before FAIR scoring.
+ALTER TABLE ontology_scores ADD COLUMN fair_score REAL;
+ALTER TABLE ontology_scores ADD COLUMN fair_findable REAL;
+ALTER TABLE ontology_scores ADD COLUMN fair_accessible REAL;
+ALTER TABLE ontology_scores ADD COLUMN fair_interoperable REAL;
+ALTER TABLE ontology_scores ADD COLUMN fair_reusable REAL;
+ALTER TABLE ontology_scores ADD COLUMN fair_credits REAL;
+ALTER TABLE ontology_scores ADD COLUMN fair_max_credits REAL;
+ALTER TABLE ontology_scores ADD COLUMN fair_version TEXT;
+ALTER TABLE ontology_scores ADD COLUMN fair_assessment_json TEXT;
+CREATE INDEX IF NOT EXISTS idx_scores_fair ON ontology_scores(fair_score);
 """
 
 D1_FTS = """-- Optional full-text index for the local fallback search.
@@ -1654,6 +1712,15 @@ def d1_row(r: dict) -> dict:
         "define_bp_score": num("define_bp_score"), "define_bp_source": g("define_bp_source"),
         "connection_score": num("connection_score"), "flat_score": num("flat_score"),
         "core_average": num("core_average", float, 4), "core_average_bp": num("core_average_bp", float, 4),
+        "fair_score": num("fair_score", float, 1),
+        "fair_findable": num("fair_findable", float, 1),
+        "fair_accessible": num("fair_accessible", float, 1),
+        "fair_interoperable": num("fair_interoperable", float, 1),
+        "fair_reusable": num("fair_reusable", float, 1),
+        "fair_credits": num("fair_credits", float, 2),
+        "fair_max_credits": num("fair_max_credits", float, 0),
+        "fair_version": g("fair_version"),
+        "fair_assessment_json": fair.compact_json(g("fair_assessment_json")),
         "logical_consistency_score": None, "structural_dist_score": None, "semantic_dist_score": None,
         "triple_count": num("triple_count", int), "entity_count": num("entities", int),
         "class_count": num("classes", int),
@@ -1681,6 +1748,8 @@ def export_phase(ctx: Ctx) -> dict:
     score_cols = ["provider", "acronym", "name", "web_status", "describe_score", "define_score",
                   "define_bp_score", "connection_score", "flat_score", "core_average", "core_average_2dp",
                   "core_average_bp", "core_average_bp_2dp", "define_bp_source", "weakest_metric",
+                  "fair_score", "fair_findable", "fair_accessible", "fair_interoperable", "fair_reusable",
+                  "fair_credits", "fair_max_credits", "fair_version",
                   "bp_categories", "bp_language", "submission_id", "bp_version", "bp_released", "bp_url"]
     df[[c for c in score_cols if c in df.columns]].to_csv(exp / "scores_compact.csv", index=False)
     files["scores_compact.csv"] = "One row per ontology with the four scores and web status."
@@ -1735,6 +1804,7 @@ def export_phase(ctx: Ctx) -> dict:
 
     # D1 SQL
     (exp / "d1_schema.sql").write_text(D1_SCHEMA, encoding="utf-8")
+    (exp / "d1_migrate_fair.sql").write_text(D1_FAIR_MIGRATION, encoding="utf-8")
     (exp / "d1_fts.sql").write_text(D1_FTS, encoding="utf-8")
     lines = []
     fts_lines = []
@@ -1747,7 +1817,8 @@ def export_phase(ctx: Ctx) -> dict:
                          f"{_sql(row['description'])}, {_sql(row['categories'])});")
     (exp / "d1_data.sql").write_text("\n".join(lines) + "\n", encoding="utf-8")
     (exp / "d1_fts_data.sql").write_text("DELETE FROM ontology_search;\n" + "\n".join(fts_lines) + "\n", encoding="utf-8")
-    files["d1_schema.sql"] = "CREATE TABLE statements for Cloudflare D1 (includes empty columns for the 3 later metrics)."
+    files["d1_schema.sql"] = "CREATE TABLE statements for a new Cloudflare D1 database."
+    files["d1_migrate_fair.sql"] = "One-time ALTER TABLE migration for a pre-FAIR D1 database."
     files["d1_data.sql"] = "INSERT OR REPLACE rows for ontology_scores."
     files["d1_fts.sql"] = "Optional full-text search table (fallback search)."
     files["d1_fts_data.sql"] = "Rows for the full-text search table."
@@ -1759,10 +1830,13 @@ def export_phase(ctx: Ctx) -> dict:
         "work_dir": str(ctx.work), "ontologies_in_catalog": int(len(df)),
         "web_status_counts": df.web_status.value_counts().to_dict(),
         "status": status(ctx),
-        "score_stats": {c: core._stats(scored[c].dropna().to_numpy()) for c in
-                        ("describe_score", "define_score", "define_bp_score", "connection_score", "flat_score",
-                         "core_average", "core_average_bp")
-                        if c in scored.columns},
+        "score_stats": {
+            c: core._stats((df if c.startswith("fair_") else scored)[c].dropna().to_numpy())
+            for c in ("describe_score", "define_score", "define_bp_score", "connection_score", "flat_score",
+                      "core_average", "core_average_bp", "fair_score", "fair_findable", "fair_accessible",
+                      "fair_interoperable", "fair_reusable")
+            if c in df.columns
+        },
         "config": ctx.cfg,
     }
     if "eval_seconds" in df.columns:

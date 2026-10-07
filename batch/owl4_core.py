@@ -1088,6 +1088,65 @@ def ontology_stats(index: OntologyIndex, entities: list) -> dict:
                 deprecated += 1
                 break
     imports = sorted({str(o) for _, o in index.pairs(OWL.imports)})
+    labelled_entities = sum(
+        1 for entity in entities if any(index.objects(entity, prop) for prop in LABEL_PROPS)
+    )
+
+    formally_defined: set = set()
+    for subject, obj in index.pairs(OWL.equivalentClass):
+        if subject in index.entities:
+            formally_defined.add(subject)
+        if obj in index.entities:
+            formally_defined.add(obj)
+    restrictions = index.subjects_of_type(OWL.Restriction)
+    for child, parent in index.pairs(RDFS.subClassOf):
+        if child in index.entities and parent in restrictions:
+            formally_defined.add(child)
+
+    provenance_predicates = {
+        DCTERMS.creator, DCTERMS.contributor, DCTERMS.source,
+        DCTERMS.created, DCTERMS.modified,
+        URIRef("http://www.w3.org/ns/prov#wasAttributedTo"),
+        URIRef("http://www.w3.org/ns/prov#wasDerivedFrom"),
+        URIRef("http://www.w3.org/ns/prov#wasGeneratedBy"),
+        URIRef("http://purl.org/pav/createdBy"),
+        URIRef("http://purl.org/pav/authoredBy"),
+        URIRef("http://purl.org/pav/curatedBy"),
+    }
+    entities_with_provenance = {
+        subject for predicate in provenance_predicates for subject, _ in index.pairs(predicate)
+        if subject in index.entities
+    }
+
+    excluded_reference_predicates = STRUCTURAL_PREDICATES | CONNECTION_ANNOTATION_PROPS | {
+        RDFS.label, SKOS.prefLabel, SKOS.altLabel,
+    }
+    qualified_cross_reference_triples = 0
+    external_reference_namespaces: set[str] = set()
+    for predicate, pairs in index.predicate_groups():
+        if predicate in excluded_reference_predicates:
+            continue
+        for subject, obj in pairs:
+            if subject not in index.entities or not isinstance(obj, URIRef) or obj in index.entities:
+                continue
+            qualified_cross_reference_triples += 1
+            text = str(obj)
+            external_reference_namespaces.add(text.rsplit("#", 1)[0] if "#" in text else text.rsplit("/", 1)[0])
+
+    standard_metadata_prefixes = (
+        "http://purl.org/dc/", "http://www.w3.org/ns/prov#", "http://purl.org/pav/",
+        "http://purl.org/vocab/vann/", "http://purl.org/vocommons/voaf#",
+        "https://w3id.org/mod#", "http://xmlns.com/foaf/0.1/",
+    )
+    ontology_nodes = index.subjects_of_type(OWL.Ontology)
+    ontology_metadata_predicates = {
+        predicate for node in ontology_nodes for predicate in index.predicates(node)
+        if predicate != RDF.type
+    }
+    ontology_metadata_standard_predicates = sum(
+        1 for predicate in ontology_metadata_predicates
+        if str(predicate).startswith(standard_metadata_prefixes)
+    )
     return {
         "triple_count": index.triple_count,
         "subjects": len(index._spo),
@@ -1107,6 +1166,13 @@ def ontology_stats(index: OntologyIndex, entities: list) -> dict:
         "equivalentclass_triples": len(index.pairs(OWL.equivalentClass)),
         "deprecated_entities": deprecated,
         "owl_imports_count": len(imports),
+        "labelled_entities": labelled_entities,
+        "formally_defined_entities": len(formally_defined),
+        "entities_with_provenance": len(entities_with_provenance),
+        "qualified_cross_reference_triples": qualified_cross_reference_triples,
+        "external_reference_namespaces": len(external_reference_namespaces),
+        "ontology_metadata_predicates": len(ontology_metadata_predicates),
+        "ontology_metadata_standard_predicates": ontology_metadata_standard_predicates,
         "owl_imports": imports[:200],
         "label_and_definition_languages": dict(lang.most_common(20)),
         "top_rdf_types": top_types,

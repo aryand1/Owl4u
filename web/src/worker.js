@@ -200,7 +200,9 @@ async function loadScores(acronyms, env) {
   const unique = [...new Set(acronyms)];
   const cols = "acronym, name, description, categories, ontology_language, submission_id, version, released, " +
     "bioportal_url, status, status_detail, describe_score, define_score, define_bp_score, define_bp_source, " +
-    "connection_score, flat_score, core_average, core_average_bp, entity_count, triple_count, evaluated_at";
+    "connection_score, flat_score, core_average, core_average_bp, entity_count, triple_count, evaluated_at, " +
+    "fair_score, fair_findable, fair_accessible, fair_interoperable, fair_reusable, fair_credits, " +
+    "fair_max_credits, fair_version, fair_assessment_json";
   for (let i = 0; i < unique.length; i += 90) { // D1 allows up to 100 bound values per query
     const chunk = unique.slice(i, i + 90);
     const sql = `SELECT ${cols} FROM ontology_scores WHERE provider = ? AND acronym IN (${chunk.map(() => "?").join(",")})`;
@@ -212,6 +214,7 @@ async function loadScores(acronyms, env) {
 
 function toResult(m, r) {
   const scored = r.status === "scored";
+  const fair = toFair(r);
   return {
     acronym: r.acronym, name: r.name || r.acronym,
     relevance: m.relevance, hits: m.hits, exact: m.exact, example: m.example,
@@ -220,12 +223,53 @@ function toResult(m, r) {
       average_bp: r.core_average_bp, average: r.core_average, describe: r.describe_score,
       define_bp: r.define_bp_score, define: r.define_score, connection: r.connection_score, flat: r.flat_score,
     } : null,
+    fair,
     define_bp_source: r.define_bp_source,
     description: r.description ? r.description.slice(0, 400) : null,
     categories: r.categories ? r.categories.split(";").filter(Boolean) : [],
     language: r.ontology_language, version: r.version, released: r.released,
     entities: r.entity_count, triples: r.triple_count, evaluated_at: r.evaluated_at,
     bioportal_url: r.bioportal_url || `https://bioportal.bioontology.org/ontologies/${encodeURIComponent(r.acronym)}`,
+  };
+}
+
+function toFair(r) {
+  if (r.fair_score === null || r.fair_score === undefined) return null;
+  let detail = null;
+  try {
+    detail = r.fair_assessment_json ? JSON.parse(r.fair_assessment_json) : null;
+  } catch (_) {
+    detail = null;
+  }
+  const scalar = {
+    F: { name: "Findable", score: r.fair_findable },
+    A: { name: "Accessible", score: r.fair_accessible },
+    I: { name: "Interoperable", score: r.fair_interoperable },
+    R: { name: "Reusable", score: r.fair_reusable },
+  };
+  const principles = {};
+  for (const code of ["F", "A", "I", "R"]) {
+    const source = detail && detail.principles && detail.principles[code];
+    principles[code] = {
+      name: source && source.name || scalar[code].name,
+      score: source && source.score !== undefined ? source.score : scalar[code].score,
+      subprinciples: source && source.subprinciples
+        ? Object.entries(source.subprinciples).map(([id, value]) => ({
+            id, label: value.label, score: value.score,
+          }))
+        : [],
+    };
+  }
+  return {
+    score: r.fair_score,
+    credits: r.fair_credits,
+    max_credits: r.fair_max_credits,
+    version: r.fair_version,
+    method: detail && detail.method || "Owl4u FAIR profile",
+    basis: detail && detail.basis || "O'FAIRe-aligned assessment",
+    principles,
+    recommendations: detail && detail.recommendations || [],
+    limitations: detail && detail.limitations || [],
   };
 }
 
@@ -249,4 +293,8 @@ export function addRanks(results) {
     }
   }
   for (const r of results) r.scored_count = scored.length;
+  const fair = results.filter((r) => r.fair && r.fair.score !== null && r.fair.score !== undefined);
+  const fairValues = fair.map((r) => r.fair.score);
+  for (const r of fair) r.fair.rank = 1 + fairValues.filter((value) => value > r.fair.score).length;
+  for (const r of results) r.fair_count = fair.length;
 }

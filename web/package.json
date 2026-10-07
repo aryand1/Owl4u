@@ -1,0 +1,8 @@
+{
+  "name": "owl4u-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

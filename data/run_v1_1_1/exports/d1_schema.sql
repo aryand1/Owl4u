@@ -21,6 +21,15 @@ CREATE TABLE IF NOT EXISTS ontology_scores (
   flat_score REAL,
   core_average REAL,
   core_average_bp REAL,
+  fair_score REAL,
+  fair_findable REAL,
+  fair_accessible REAL,
+  fair_interoperable REAL,
+  fair_reusable REAL,
+  fair_credits REAL,
+  fair_max_credits REAL,
+  fair_version TEXT,
+  fair_assessment_json TEXT,
   logical_consistency_score REAL,
   structural_dist_score REAL,
   semantic_dist_score REAL,
@@ -36,6 +45,7 @@ CREATE TABLE IF NOT EXISTS ontology_scores (
 );
 CREATE INDEX IF NOT EXISTS idx_scores_avg ON ontology_scores(core_average);
 CREATE INDEX IF NOT EXISTS idx_scores_avg_bp ON ontology_scores(core_average_bp);
+CREATE INDEX IF NOT EXISTS idx_scores_fair ON ontology_scores(fair_score);
 CREATE INDEX IF NOT EXISTS idx_scores_status ON ontology_scores(status);
 CREATE TABLE IF NOT EXISTS keyword_cache (
   keyword TEXT NOT NULL,

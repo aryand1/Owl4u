@@ -93,7 +93,8 @@ def preflight(bioportal_api: str) -> bool:
         return False
 
     try:
-        D1().query("SELECT 1 AS ok")
+        d1 = D1()
+        d1.query("SELECT 1 AS ok")
     except (RuntimeError, requests.RequestException) as e:
         msg = str(e)
         if "10000" in msg or "Authentication" in msg:
@@ -104,6 +105,13 @@ def preflight(bioportal_api: str) -> bool:
             fail("Cannot reach the D1 database", msg[:400])
         return False
     print("Preflight: D1 database reachable.")
+    try:
+        d1.query("SELECT fair_score FROM ontology_scores LIMIT 1")
+    except RuntimeError:
+        fail("FAIR database migration required",
+             "Run web/migrations/0002_fair_scores.sql against D1 before using this version of the nightly job.")
+        return False
+    print("Preflight: FAIR score columns available.")
 
     try:
         r = requests.get(f"{bioportal_api.rstrip('/')}/ontologies",
@@ -196,7 +204,7 @@ def main() -> int:
                          [PROVIDER, acr, row["name"], row["description"], row["categories"]])
             except RuntimeError as exc:
                 print(f"  (full-text index not updated for {acr}: {exc})")
-            updated.append((acr, row["status"], row.get("core_average_bp")))
+            updated.append((acr, row["status"], row.get("core_average_bp"), row.get("fair_score")))
         except Exception as exc:  # noqa: BLE001
             errors.append((acr, str(exc)[:200]))
 
@@ -208,8 +216,9 @@ def main() -> int:
               f"- Deferred to the next run: {len(deferred)}",
               f"- Errors writing to D1: {len(errors)}", ""]
     if updated:
-        report += ["| Ontology | Status | Average |", "|---|---|---|"]
-        report += [f"| {a} | {s} | {'' if v is None else f'{v:.2f}'} |" for a, s, v in updated]
+        report += ["| Ontology | Status | WiseOwl average | FAIR |", "|---|---|---|---|"]
+        report += [f"| {a} | {s} | {'' if v is None else f'{v:.2f}'} | "
+                   f"{'' if fv is None else f'{fv:.1f}'} |" for a, s, v, fv in updated]
         report.append("")
     if kept:
         report += ["Run these on the GPU machine (notebook, `only=[...]`): " + ", ".join(f"{a} ({s})" for a, s in kept), ""]

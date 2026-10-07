@@ -10,6 +10,7 @@ nightly_work/
 *.parquet
 *.gz
 results_detail.jsonl
+fair_backfill.sql
 
 # web tooling
 web/.wrangler/
