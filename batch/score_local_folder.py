@@ -9,12 +9,16 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import re
+import zipfile
 from collections import defaultdict
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import owl4_pipeline as pipeline
+if TYPE_CHECKING:
+    import owl4_pipeline as pipeline
 
 
 SUPPORTED_SUFFIXES = {
@@ -23,11 +27,41 @@ SUPPORTED_SUFFIXES = {
 }
 
 
+def is_ontology_candidate(path: Path) -> bool:
+    """Reject container metadata while retaining RDF/OWL XML documents.
+
+    ``.xml`` is deliberately treated more carefully than ontology-specific
+    suffixes.  Office Open XML packages also contain many XML files (for
+    example ``xl/styles.xml``), but those files are not semantic artefacts.
+    """
+    suffix = path.suffix.casefold()
+    if suffix not in SUPPORTED_SUFFIXES:
+        return False
+    if suffix == ".zip":
+        try:
+            with zipfile.ZipFile(path) as archive:
+                return "[Content_Types].xml" not in archive.namelist()
+        except (OSError, zipfile.BadZipFile):
+            return True
+    if suffix != ".xml":
+        return True
+    try:
+        head = path.read_bytes()[:65536].decode("utf-8", errors="ignore").casefold()
+    except OSError:
+        return False
+    markers = (
+        "<rdf:rdf", "<owl:ontology", "<ontology",
+        "<trix", "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+        "http://www.w3.org/2002/07/owl#",
+    )
+    return any(marker in head for marker in markers)
+
+
 def discover_files(root: Path) -> list[Path]:
     """Return supported ontology/archive files below ``root`` in stable order."""
     return sorted(
         (path.resolve() for path in root.rglob("*")
-         if path.is_file() and path.suffix.casefold() in SUPPORTED_SUFFIXES),
+         if path.is_file() and is_ontology_candidate(path)),
         key=lambda path: path.as_posix().casefold(),
     )
 
@@ -44,8 +78,45 @@ def _path_key(value: str | os.PathLike[str]) -> str:
     return os.path.normcase(os.path.abspath(os.fspath(value)))
 
 
+def prune_false_registrations(ctx: pipeline.Ctx, root: Path, files: list[Path]) -> int:
+    """Remove local rows that an older run mistook for ontology XML files."""
+    accepted = {_path_key(path) for path in files}
+    root_key = _path_key(root)
+    doomed: list[tuple[str, int]] = []
+    for row in ctx.state.q(
+        "SELECT d.acronym, d.submission_id, d.raw_path, c.ontology_json "
+        "FROM downloads d JOIN catalog c ON c.acronym=d.acronym"
+    ):
+        raw_path = row.get("raw_path")
+        if not raw_path:
+            continue
+        try:
+            local_file = bool(json.loads(row.get("ontology_json") or "{}").get("local_file"))
+            path_key = _path_key(raw_path)
+            inside_root = os.path.commonpath((root_key, path_key)) == root_key
+        except (OSError, ValueError, TypeError):
+            continue
+        if local_file and inside_root and path_key not in accepted and not is_ontology_candidate(Path(raw_path)):
+            doomed.append((row["acronym"], int(row["submission_id"])))
+    if not doomed:
+        return 0
+    with ctx.state.conn:
+        for acronym, submission_id in doomed:
+            ctx.state.conn.execute(
+                "DELETE FROM evaluations WHERE acronym=? AND submission_id=?", (acronym, submission_id)
+            )
+            ctx.state.conn.execute(
+                "DELETE FROM downloads WHERE acronym=? AND submission_id=?", (acronym, submission_id)
+            )
+            ctx.state.conn.execute("DELETE FROM catalog WHERE acronym=?", (acronym,))
+    ctx.event("local", None, "INFO", f"removed {len(doomed)} non-ontology XML registrations")
+    return len(doomed)
+
+
 def register_files(ctx: pipeline.Ctx, root: Path, files: list[Path]) -> tuple[list[str], dict[str, int]]:
     """Register files while preserving completed converted/repaired inputs."""
+    import owl4_pipeline as pipeline
+
     downloads = ctx.state.q("SELECT acronym, submission_id, raw_path FROM downloads")
     catalog = ctx.state.q("SELECT acronym, name FROM catalog")
     evaluations = {
@@ -95,6 +166,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    import owl4_pipeline as pipeline
+
     args = build_parser().parse_args()
     root = args.source.expanduser().resolve()
     if not root.is_dir():
@@ -110,8 +183,10 @@ def main() -> int:
         "device": "auto",
         "keep_awake": True,
     })
+    pruned = prune_false_registrations(ctx, root, files)
     targets, registration = register_files(ctx, root, files)
     print(f"Source: {root}")
+    print(f"Ignored/pruned non-ontology files: {pruned}")
     print(f"Registration: {registration}")
     if args.fair_only:
         print("FAIR-only mode: WiseOwl evaluation skipped.")
