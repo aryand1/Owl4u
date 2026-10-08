@@ -65,7 +65,20 @@ class FairAssessmentTests(unittest.TestCase):
 
     def test_assessment_is_json_serializable(self):
         encoded = json.dumps(fair.assess())
-        self.assertIn("owl4-fair-1.0", encoded)
+        self.assertIn("owl4-fair-1.1", encoded)
+
+    def test_local_files_do_not_receive_bioportal_access_credits(self):
+        result = fair.assess(
+            {"acronym": "LOCAL", "name": "Local file", "local_file": True},
+            {},
+            {},
+            {"provider": "local", "catalog_status": "ok", "download_status": "ok"},
+        )
+        checks = {check["id"]: check for check in all_checks(result)}
+        self.assertEqual(0.0, checks["F3Q2"]["score"])
+        self.assertEqual(0.0, checks["A1.1Q1"]["score"])
+        self.assertEqual("not_tested", checks["A1.2Q1"]["status"])
+        self.assertEqual("not_tested", checks["A2Q3"]["status"])
 
 
 class D1SchemaTests(unittest.TestCase):

@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 from urllib.parse import urlparse
 
-FAIR_SCORE_VERSION = "owl4-fair-1.0"
+FAIR_SCORE_VERSION = "owl4-fair-1.1"
 FAIR_MAX_CREDITS = 478.0
 
 PRINCIPLES = {
@@ -233,8 +233,13 @@ def assess(ontology: dict | None = None, submission: dict | None = None,
     identifiers = ev.values("identifier", "dct:identifier")
     valid_identifiers = [value for value in identifiers if _is_uri(value)]
     doi_identifiers = [value for value in identifiers if _is_doi(value)]
+    provider = (ev.one("provider") or "").casefold()
+    local_file = bool((ontology or {}).get("local_file")) or provider == "local"
+    bioportal_record = provider == "bioportal" and not local_file
     catalog_status = ev.one("catalog_status")
-    catalog_ok = (catalog_status in {"ok", "scored"}) if catalog_status else bool(ontology or submission)
+    raw_catalog_ok = ((catalog_status in {"ok", "scored"})
+                      if catalog_status else bool(ontology or submission))
+    catalog_ok = raw_catalog_ok and not local_file
     download_status = ev.one("download_status", "web_status")
     download_ok = (download_status in {"ok", "scored"}) if download_status else False
 
@@ -249,8 +254,8 @@ def assess(ontology: dict | None = None, submission: dict | None = None,
         "Register a DOI or another external persistent identifier.")
     add("F1Q3", "F1", "Metadata record explicitly identifies the ontology",
         12 if catalog_ok else 0, 12,
-        "BioPortal binds the metadata record to its ontology acronym and submission."
-        if catalog_ok else "No usable BioPortal metadata record was found.",
+        "An external metadata record explicitly identifies this ontology."
+        if catalog_ok else "No external metadata record was found for this local file.",
         "Publish a metadata record explicitly linked to the ontology.")
     f1q4 = 4 if _is_uri(version_uri) else 2 if version_uri else 0
     add("F1Q4", "F1", "A version-specific identifier is supplied", f1q4, 9,
@@ -292,11 +297,11 @@ def assess(ontology: dict | None = None, submission: dict | None = None,
         "The pipeline cannot prove that all catalog metadata are embedded in the file.",
         "Embed core metadata on the owl:Ontology resource.", assessed=False)
     add("F3Q2", "F3", "Metadata are available in an external record", 11 if catalog_ok else 0, 11,
-        "BioPortal exposes a versioned metadata record." if catalog_ok else "No external metadata record found.",
+        "A versioned external metadata record is available." if catalog_ok else "No external metadata record found.",
         "Publish an external metadata record.")
     add("F3Q3", "F3", "External metadata and ontology are explicitly linked",
         10 if catalog_ok and ev.has("acronym", "name") else 0, 10,
-        "BioPortal links the ontology record, acronym and submission."
+        "The external record links the ontology name, identifier and submission."
         if catalog_ok else "An explicit bidirectional link was not established.",
         "Link the metadata record and ontology in both directions.")
 
@@ -305,7 +310,7 @@ def assess(ontology: dict | None = None, submission: dict | None = None,
     add("F4Q1", "F4", "Registered in ontology libraries", _score_for_count(library_count, 6, 3), 6,
         f"{library_count} recognized library registrations found.",
         "Register the ontology in FAIRsharing, LOV or BARTOC.")
-    repo_count = (1 if catalog_ok else 0) + len({x for x in catalogs if any(
+    repo_count = (1 if bioportal_record else 0) + len({x for x in catalogs if any(
         k in x.lower() for k in ("bioportal", "agroportal", "obofoundry", "ontobee", "ols", "ontohub"))})
     add("F4Q2", "F4", "Registered in open ontology repositories",
         _score_for_count(repo_count, 10, 5), 10,
@@ -327,7 +332,7 @@ def assess(ontology: dict | None = None, submission: dict | None = None,
     formats = 0
     if catalog_ok:
         formats += 1  # JSON metadata
-    if download_ok:
+    if download_ok and not local_file:
         formats += 1  # ontology download
     if ev.has("hasFormat", "isFormatOf"):
         formats += 1
@@ -340,24 +345,39 @@ def assess(ontology: dict | None = None, submission: dict | None = None,
         f"SPARQL or alternate endpoint: {endpoint or 'not supplied'}",
         "Publish a SPARQL endpoint or another standard machine-access protocol.")
 
-    add("A1.1Q1", "A1.1", "HTTP/URIs are used for identification and access", 20, 20,
-        "BioPortal provides HTTP API and download URLs.")
-    add("A1.1Q2", "A1.1", "Ontology access protocol is open and implementable", 4, 4,
-        "HTTP(S) is an open, widely implemented protocol.")
-    add("A1.1Q3", "A1.1", "Metadata access protocol is open and implementable", 4, 4,
-        "BioPortal exposes metadata over HTTP(S).")
-    add("A1.2Q1", "A1.2", "Ontology protocol supports authentication and authorization", 11, 11,
-        "BioPortal's HTTP API supports API-key authorization.")
-    add("A1.2Q2", "A1.2", "Metadata protocol supports authentication and authorization", 11, 11,
-        "BioPortal's metadata API supports API-key authorization.")
+    http_access = _is_http(ontology_uri)
+    add("A1.1Q1", "A1.1", "HTTP/URIs are used for identification and access",
+        20 if http_access else 0, 20,
+        "An HTTP(S) ontology identifier is supplied." if http_access
+        else "A local filesystem path is not a universally accessible identifier.")
+    add("A1.1Q2", "A1.1", "Ontology access protocol is open and implementable",
+        4 if http_access else 0, 4,
+        "HTTP(S) is an open, widely implemented protocol." if http_access
+        else "No open network access protocol was evidenced.")
+    add("A1.1Q3", "A1.1", "Metadata access protocol is open and implementable",
+        4 if catalog_ok else 0, 4,
+        "External metadata are exposed through an open protocol." if catalog_ok
+        else "No external metadata access protocol was evidenced.")
+    add("A1.2Q1", "A1.2", "Ontology protocol supports authentication and authorization",
+        11 if bioportal_record else 0, 11,
+        "BioPortal's HTTP API supports API-key authorization." if bioportal_record
+        else "Authentication support was not tested for this local file.", assessed=bioportal_record)
+    add("A1.2Q2", "A1.2", "Metadata protocol supports authentication and authorization",
+        11 if bioportal_record else 0, 11,
+        "BioPortal's metadata API supports API-key authorization." if bioportal_record
+        else "Authentication support was not tested for local metadata.", assessed=bioportal_record)
 
-    add("A2Q1", "A2", "Repository supports ontology versioning", 7, 7,
-        "BioPortal stores versioned ontology submissions.")
+    versioning_evidence = bioportal_record or bool(version_uri) or ev.has("submission_id", "version", "bp_version")
+    add("A2Q1", "A2", "Repository supports ontology versioning", 7 if versioning_evidence else 0, 7,
+        "Versioned repository or ontology metadata were found." if versioning_evidence
+        else "No repository versioning evidence was found.")
     add("A2Q2", "A2", "Metadata are available for each version", 5 if ev.has("submission_id") else 0, 5,
         f"Submission identifier: {ev.one('submission_id') or 'not supplied'}",
         "Publish version-specific metadata.")
-    add("A2Q3", "A2", "Metadata remain available after ontology retirement", 4, 4,
-        "BioPortal retains ontology records and submission metadata.")
+    add("A2Q3", "A2", "Metadata remain available after ontology retirement",
+        4 if bioportal_record else 0, 4,
+        "BioPortal retains ontology records and submission metadata." if bioportal_record
+        else "Long-term metadata retention was not tested.", assessed=bioportal_record)
     status_fields = _present_count(ev, [("status", "bp_status"), ("deprecated", "bp_submission_status")])
     add("A2Q4", "A2", "Ontology status is clearly stated", _score_for_count(status_fields, 4, 2), 4,
         f"{status_fields} lifecycle/status field(s) found.",
@@ -537,7 +557,8 @@ def assess(ontology: dict | None = None, submission: dict | None = None,
     add("R1.3Q2", "R1.3", "Included in a recognized community set", community_score, 20,
         f"Community groups: {', '.join(groups[:4]) or 'none'}",
         "Join a relevant community ontology set and document conformance.")
-    public = (access or "public").lower() not in {"private", "restricted"} and download_ok
+    public = ((access or "public").lower() not in {"private", "restricted"}
+              and download_ok and not local_file)
     add("R1.3Q3", "R1.3", "Ontology is openly and freely available", 6 if public else 0, 6,
         f"Access appears {'public' if public else 'restricted or unavailable'}.",
         "Make the ontology publicly downloadable under an open licence.")
